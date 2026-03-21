@@ -1,8 +1,10 @@
+import { reduceSession } from '../../core/session/sessionReducer';
 import type {
   PracticeSection,
   VideoPracticeSession,
 } from '../../core/session/types';
 import type { OverlayViewModel } from '../ui/overlayView';
+import type { ShortcutAction } from './defaultKeymap';
 
 type RestoreStatus = 'idle' | 'started' | 'blocked';
 
@@ -35,20 +37,23 @@ export type RestoreResult = {
   restoreStatus: RestoreStatus;
 } | null;
 
-function getActiveSection(session: VideoPracticeSession): PracticeSection | null {
-  const sectionIds = [session.activeSectionId, session.selectedSectionId].filter(
-    (value): value is string => value !== null,
-  );
-
-  for (const sectionId of sectionIds) {
-    const match = session.sections.find((section) => section.id === sectionId);
-
-    if (match) {
-      return match;
-    }
+function getSectionById(
+  session: VideoPracticeSession,
+  sectionId: string | null,
+): PracticeSection | null {
+  if (!sectionId) {
+    return null;
   }
 
-  return null;
+  return session.sections.find((section) => section.id === sectionId) ?? null;
+}
+
+function getSelectedSection(session: VideoPracticeSession): PracticeSection | null {
+  return getSectionById(session, session.selectedSectionId);
+}
+
+function getActiveSection(session: VideoPracticeSession): PracticeSection | null {
+  return getSectionById(session, session.activeSectionId);
 }
 
 function formatSpeedLabel(speed: number): string {
@@ -57,16 +62,20 @@ function formatSpeedLabel(speed: number): string {
 
 function toViewModel(
   session: VideoPracticeSession,
+  selectedSection: PracticeSection | null,
   activeSection: PracticeSection | null,
   restoreStatus: RestoreStatus,
+  panelExpanded: boolean,
 ): OverlayViewModel {
-  const speed = activeSection?.speedOverride ?? session.defaultSpeed;
+  const displaySection = selectedSection ?? activeSection;
+  const speed =
+    displaySection?.speedOverride ?? activeSection?.speedOverride ?? session.defaultSpeed;
 
   return {
-    selectedSectionName: activeSection?.name ?? null,
+    selectedSectionName: displaySection?.name ?? null,
     speedLabel: formatSpeedLabel(speed),
     loopEnabled: session.loopEnabled,
-    panelExpanded: false,
+    panelExpanded,
     restoreStatus,
     sections: session.sections
       .slice()
@@ -80,54 +89,123 @@ function toViewModel(
 }
 
 export function createAppController(deps: AppControllerDeps) {
+  const isActive = deps.isActive ?? (() => true);
+  let session: VideoPracticeSession | null = null;
+  let panelExpanded = false;
+  let restoreStatus: RestoreStatus = 'idle';
+
+  const render = () => {
+    if (!session) {
+      return;
+    }
+
+    deps.overlay.render(
+      toViewModel(
+        session,
+        getSelectedSection(session),
+        getActiveSection(session),
+        restoreStatus,
+        panelExpanded,
+      ),
+    );
+  };
+
+  const applySectionPlayback = async (
+    nextSection: PracticeSection | null,
+    shouldAutoplay: boolean,
+  ): Promise<RestoreStatus> => {
+    if (!session || !isActive()) {
+      return 'idle';
+    }
+
+    const speed = nextSection?.speedOverride ?? session.defaultSpeed;
+
+    if (nextSection) {
+      deps.player.setCurrentTime(nextSection.startTimeSec);
+    }
+
+    deps.player.setPlaybackRate(speed);
+
+    if (!shouldAutoplay || !nextSection) {
+      return 'idle';
+    }
+
+    try {
+      return await deps.player.playSafely();
+    } catch (error) {
+      if (
+        !isActive() &&
+        error instanceof DOMException &&
+        error.name === 'AbortError'
+      ) {
+        return 'idle';
+      }
+
+      throw error;
+    }
+  };
+
   return {
     async start(): Promise<RestoreResult> {
-      const isActive = deps.isActive ?? (() => true);
-      const session = await deps.store.load(deps.videoId);
+      session = await deps.store.load(deps.videoId);
 
       if (!session || !isActive()) {
         return null;
       }
 
       const activeSection = getActiveSection(session);
-      const speed = activeSection?.speedOverride ?? session.defaultSpeed;
       const canRestoreLoop = session.loopEnabled && activeSection !== null;
+      panelExpanded = false;
+      restoreStatus = await applySectionPlayback(activeSection, canRestoreLoop);
 
       if (!isActive()) {
         return null;
       }
 
-      if (activeSection) {
-        deps.player.setCurrentTime(activeSection.startTimeSec);
-      }
-
-      deps.player.setPlaybackRate(speed);
-
-      let restoreStatus: RestoreStatus = 'idle';
-
-      if (canRestoreLoop) {
-        try {
-          restoreStatus = await deps.player.playSafely();
-        } catch (error) {
-          if (
-            !isActive() &&
-            error instanceof DOMException &&
-            error.name === 'AbortError'
-          ) {
-            return null;
-          }
-
-          throw error;
-        }
-      }
-
-      if (!isActive()) {
-        return null;
-      }
-
-      deps.overlay.render(toViewModel(session, activeSection, restoreStatus));
+      render();
 
       return { session, activeSection, restoreStatus };
+    },
+    async handleShortcut(action: ShortcutAction): Promise<void> {
+      if (!session || !isActive()) {
+        return;
+      }
+
+      if (action === 'togglePanel') {
+        panelExpanded = !panelExpanded;
+        render();
+        return;
+      }
+
+      session = reduceSession(session, { type: action });
+
+      if (action === 'executeSelectedSection') {
+        restoreStatus = await applySectionPlayback(getActiveSection(session), true);
+      } else {
+        restoreStatus = 'idle';
+      }
+
+      if (!isActive()) {
+        return;
+      }
+
+      await deps.store.save(session);
+
+      if (!isActive()) {
+        return;
+      }
+
+      render();
+    },
+    getLoopSection(): PracticeSection | null {
+      if (!session || !session.loopEnabled) {
+        return null;
+      }
+
+      return getActiveSection(session);
+    },
+    hasSession(): boolean {
+      return session !== null;
     },
   };
 }

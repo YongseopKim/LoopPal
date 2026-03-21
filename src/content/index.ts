@@ -1,6 +1,7 @@
 import { createSessionStore } from '../core/session/storage';
 import { createAppController } from './runtime/appController';
 import { createLoopMonitor } from './runtime/loopMonitor';
+import { createShortcutController } from './runtime/shortcutController';
 import { waitForVideoElement } from './runtime/videoLocator';
 import {
   extractVideoId,
@@ -41,6 +42,7 @@ function clearOverlayRoot() {
 function createBootstrapBinding(videoId: string | null) {
   let loopTimer: number | null = null;
   let disposed = false;
+  let removeKeydownListener: (() => void) | null = null;
 
   const isActive = () =>
     !disposed &&
@@ -56,6 +58,8 @@ function createBootstrapBinding(videoId: string | null) {
       loopTimer = null;
     }
 
+    removeKeydownListener?.();
+    removeKeydownListener = null;
     clearOverlayRoot();
   };
 
@@ -95,17 +99,33 @@ function createBootstrapBinding(videoId: string | null) {
       videoId,
       isActive,
     });
-    const restored = await controller.start();
+    const shortcutController = createShortcutController({
+      onAction(action) {
+        void controller.handleShortcut(action);
+      },
+    });
+    const handleKeydown = (event: KeyboardEvent) => {
+      shortcutController.handle(event);
+    };
 
-    if (!isActive() || !restored?.activeSection || !restored.session.loopEnabled) {
+    document.addEventListener('keydown', handleKeydown);
+    removeKeydownListener = () => {
+      document.removeEventListener('keydown', handleKeydown);
+    };
+
+    await controller.start();
+
+    if (!isActive() || !controller.hasSession()) {
       return;
     }
 
     const loopMonitor = createLoopMonitor(player);
 
     loopTimer = window.setInterval(() => {
-      if (isActive()) {
-        loopMonitor.tick(restored.activeSection);
+      const activeSection = controller.getLoopSection();
+
+      if (isActive() && activeSection) {
+        loopMonitor.tick(activeSection);
       }
     }, LOOP_MONITOR_INTERVAL_MS);
   };

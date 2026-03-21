@@ -48,6 +48,16 @@ describe('sessionReducer', () => {
     expect(next.activeSectionId).toBeNull();
   });
 
+  it('moves selection backward by stable section order', () => {
+    const next = reduceSession(
+      { ...seedSession, selectedSectionId: 'section-2' },
+      { type: 'selectPreviousSection' },
+    );
+
+    expect(next.selectedSectionId).toBe('section-1');
+    expect(next.activeSectionId).toBeNull();
+  });
+
   it('moves selection by stable section order when the array is unsorted', () => {
     const unsortedSession: VideoPracticeSession = {
       ...seedSession,

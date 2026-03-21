@@ -3,6 +3,7 @@ import type { PracticeSection, VideoPracticeSession } from './types';
 const MAX_SECTIONS = 10;
 
 export type SessionAction =
+  | { type: 'selectPreviousSection' }
   | { type: 'selectNextSection' }
   | { type: 'executeSelectedSection' }
   | { type: 'createSection'; payload: PracticeSection };
@@ -59,6 +60,11 @@ export function reduceSession(
   action: SessionAction,
 ): VideoPracticeSession {
   switch (action.type) {
+    case 'selectPreviousSection':
+      return {
+        ...session,
+        selectedSectionId: getAdjacentSectionId(session, -1),
+      };
     case 'selectNextSection':
       return {
         ...session,

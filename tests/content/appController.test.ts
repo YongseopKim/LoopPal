@@ -20,6 +20,16 @@ const seedSession: VideoPracticeSession = {
       order: 0,
       updatedAt: 1_710_000_000_000,
     },
+    {
+      id: 'section-2',
+      name: 'Chorus',
+      memo: 'Push the accents',
+      startTimeSec: 30.1,
+      endTimeSec: 44.2,
+      speedOverride: null,
+      order: 1,
+      updatedAt: 1_710_000_000_100,
+    },
   ],
 };
 
@@ -199,5 +209,53 @@ describe('appController', () => {
     monitor.tick({ startTimeSec: 10.1, endTimeSec: 20.1 });
 
     expect(player.setCurrentTime).toHaveBeenCalledWith(10.1);
+  });
+
+  it('updates selection, executes the selected section, and toggles the panel from shortcuts', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+    player.setCurrentTime.mockClear();
+    player.setPlaybackRate.mockClear();
+    player.playSafely.mockClear();
+
+    await controller.handleShortcut('selectNextSection');
+
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({ selectedSectionId: 'section-2' }),
+    );
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Chorus',
+        panelExpanded: false,
+      }),
+    );
+
+    await controller.handleShortcut('togglePanel');
+
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({ panelExpanded: true }),
+    );
+
+    await controller.handleShortcut('executeSelectedSection');
+
+    expect(player.setCurrentTime).toHaveBeenCalledWith(30.1);
+    expect(player.setPlaybackRate).toHaveBeenCalledWith(0.8);
+    expect(player.playSafely).toHaveBeenCalledTimes(1);
+    expect(store.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeSectionId: 'section-2',
+        loopEnabled: true,
+      }),
+    );
   });
 });
