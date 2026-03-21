@@ -25,6 +25,7 @@ export type AppControllerDeps = {
   player: AppPlayer;
   overlay: AppOverlay;
   videoId: string;
+  isActive?: () => boolean;
 };
 
 export type RestoreResult = {
@@ -80,9 +81,10 @@ function toViewModel(
 export function createAppController(deps: AppControllerDeps) {
   return {
     async start(): Promise<RestoreResult> {
+      const isActive = deps.isActive ?? (() => true);
       const session = await deps.store.load(deps.videoId);
 
-      if (!session) {
+      if (!session || !isActive()) {
         return null;
       }
 
@@ -90,11 +92,19 @@ export function createAppController(deps: AppControllerDeps) {
       const speed = activeSection?.speedOverride ?? session.defaultSpeed;
       const canRestoreLoop = session.loopEnabled && activeSection !== null;
 
+      if (!isActive()) {
+        return null;
+      }
+
       deps.player.setPlaybackRate(speed);
 
       const restoreStatus = canRestoreLoop
         ? await deps.player.playSafely()
         : ('idle' as const);
+
+      if (!isActive()) {
+        return null;
+      }
 
       deps.overlay.render(toViewModel(session, activeSection, restoreStatus));
 

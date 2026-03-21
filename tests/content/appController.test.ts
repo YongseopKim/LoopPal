@@ -99,6 +99,39 @@ describe('appController', () => {
     );
   });
 
+  it('skips player and overlay side effects after restore is invalidated mid-start', async () => {
+    let active = true;
+    let resolveLoad: ((value: VideoPracticeSession) => void) | null = null;
+    const store = {
+      load: vi.fn().mockImplementation(
+        () =>
+          new Promise<VideoPracticeSession>((resolve) => {
+            resolveLoad = resolve;
+          }),
+      ),
+      save: vi.fn(),
+    };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+      isActive: () => active,
+    });
+
+    const startPromise = controller.start();
+
+    active = false;
+    resolveLoad?.(seedSession);
+
+    await expect(startPromise).resolves.toBeNull();
+    expect(player.setPlaybackRate).not.toHaveBeenCalled();
+    expect(player.playSafely).not.toHaveBeenCalled();
+    expect(overlay.render).not.toHaveBeenCalled();
+  });
+
   it('seeks back to the loop start when playback crosses the loop end', () => {
     const player = fakePlayer({ currentTime: 20.2 });
     const monitor = createLoopMonitor(player);

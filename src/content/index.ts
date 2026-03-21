@@ -1,6 +1,7 @@
 import { createSessionStore } from '../core/session/storage';
 import { createAppController } from './runtime/appController';
 import { createLoopMonitor } from './runtime/loopMonitor';
+import { waitForVideoElement } from './runtime/videoLocator';
 import {
   extractVideoId,
   isWatchPage,
@@ -10,6 +11,13 @@ import { createYoutubePlayer } from './runtime/youtubePlayer';
 import { createOverlayView } from './ui/overlayView';
 
 const LOOP_MONITOR_INTERVAL_MS = 50;
+const VIDEO_LOOKUP_INTERVAL_MS = 50;
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
 
 function ensureOverlayRoot() {
   const existingRoot = document.querySelector('[data-bp-overlay-root]');
@@ -34,6 +42,12 @@ function createBootstrapBinding(videoId: string | null) {
   let loopTimer: number | null = null;
   let disposed = false;
 
+  const isActive = () =>
+    !disposed &&
+    videoId !== null &&
+    isWatchPage(window.location.href) &&
+    extractVideoId(window.location.href) === videoId;
+
   const stop = () => {
     disposed = true;
 
@@ -49,27 +63,50 @@ function createBootstrapBinding(videoId: string | null) {
     return { videoId, stop };
   }
 
-  const video = document.querySelector('video');
-
-  if (!(video instanceof HTMLVideoElement)) {
-    return { videoId, stop };
-  }
-
   const bootstrap = async () => {
+    const video = await waitForVideoElement({
+      findVideo: () => {
+        const candidate = document.querySelector('video');
+
+        return candidate instanceof HTMLVideoElement ? candidate : null;
+      },
+      isActive,
+      sleep,
+      intervalMs: VIDEO_LOOKUP_INTERVAL_MS,
+    });
+
+    if (!(video instanceof HTMLVideoElement) || !isActive()) {
+      return;
+    }
+
     const store = createSessionStore(chrome.storage.local);
     const player = createYoutubePlayer(video);
     const overlay = createOverlayView(ensureOverlayRoot());
-    const controller = createAppController({ store, player, overlay, videoId });
+    const controller = createAppController({
+      store,
+      player,
+      overlay: {
+        render(model) {
+          if (isActive()) {
+            overlay.render(model);
+          }
+        },
+      },
+      videoId,
+      isActive,
+    });
     const restored = await controller.start();
 
-    if (disposed || !restored?.activeSection || !restored.session.loopEnabled) {
+    if (!isActive() || !restored?.activeSection || !restored.session.loopEnabled) {
       return;
     }
 
     const loopMonitor = createLoopMonitor(player);
 
     loopTimer = window.setInterval(() => {
-      loopMonitor.tick(restored.activeSection);
+      if (isActive()) {
+        loopMonitor.tick(restored.activeSection);
+      }
     }, LOOP_MONITOR_INTERVAL_MS);
   };
 

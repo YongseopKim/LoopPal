@@ -36,22 +36,12 @@ type PageLocationLike = {
   href: string;
 };
 
-type HistoryMethod = (
-  data: unknown,
-  unused: string,
-  url?: string | URL | null,
-) => void;
-
-type HistoryLike = {
-  pushState: HistoryMethod;
-  replaceState: HistoryMethod;
-};
+type NavigationEventName = 'popstate' | 'yt-navigate-finish';
 
 type PageWindowLike = {
   location: PageLocationLike;
-  history: HistoryLike;
-  addEventListener(type: 'popstate', listener: () => void): void;
-  removeEventListener(type: 'popstate', listener: () => void): void;
+  addEventListener(type: NavigationEventName, listener: () => void): void;
+  removeEventListener(type: NavigationEventName, listener: () => void): void;
 };
 
 export function subscribeToPageNavigations(
@@ -59,10 +49,6 @@ export function subscribeToPageNavigations(
   onNavigate: (url: string) => void,
 ) {
   let previousUrl = pageWindow.location.href;
-  const originalPushState = pageWindow.history.pushState.bind(pageWindow.history);
-  const originalReplaceState = pageWindow.history.replaceState.bind(
-    pageWindow.history,
-  );
 
   const notifyIfChanged = () => {
     const nextUrl = pageWindow.location.href;
@@ -75,25 +61,15 @@ export function subscribeToPageNavigations(
     onNavigate(nextUrl);
   };
 
-  pageWindow.history.pushState = (data, unused, url) => {
-    originalPushState(data, unused, url);
+  const handleNavigation = () => {
     notifyIfChanged();
   };
 
-  pageWindow.history.replaceState = (data, unused, url) => {
-    originalReplaceState(data, unused, url);
-    notifyIfChanged();
-  };
-
-  const handlePopState = () => {
-    notifyIfChanged();
-  };
-
-  pageWindow.addEventListener('popstate', handlePopState);
+  pageWindow.addEventListener('yt-navigate-finish', handleNavigation);
+  pageWindow.addEventListener('popstate', handleNavigation);
 
   return () => {
-    pageWindow.history.pushState = originalPushState;
-    pageWindow.history.replaceState = originalReplaceState;
-    pageWindow.removeEventListener('popstate', handlePopState);
+    pageWindow.removeEventListener('yt-navigate-finish', handleNavigation);
+    pageWindow.removeEventListener('popstate', handleNavigation);
   };
 }

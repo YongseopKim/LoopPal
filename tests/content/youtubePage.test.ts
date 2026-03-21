@@ -76,11 +76,27 @@ describe('youtubePage', () => {
       onNavigate,
     );
 
-    fakeWindow.history.pushState({}, '', 'https://www.youtube.com/watch?v=next456');
+    fakeWindow.location.href = 'https://www.youtube.com/watch?v=next456';
+    fakeWindow.dispatch('yt-navigate-finish');
 
     expect(onNavigate).toHaveBeenCalledWith(
       'https://www.youtube.com/watch?v=next456',
     );
+
+    unsubscribe();
+  });
+
+  it('ignores finish events when the URL did not change', () => {
+    const fakeWindow = createFakeWindow('https://www.youtube.com/watch?v=abc123');
+    const onNavigate = vi.fn();
+    const unsubscribe = subscribeToPageNavigations(
+      fakeWindow as unknown as Window,
+      onNavigate,
+    );
+
+    fakeWindow.dispatch('yt-navigate-finish');
+
+    expect(onNavigate).not.toHaveBeenCalled();
 
     unsubscribe();
   });
