@@ -62,4 +62,29 @@ describe('shortcutController', () => {
 
     expect(onAction).not.toHaveBeenCalled();
   });
+
+  it('ignores key presses from shadow-dom text inputs', () => {
+    const host = document.createElement('div');
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const input = document.createElement('input');
+
+    shadowRoot.append(input);
+    document.body.append(host);
+    input.focus();
+
+    const onAction = vi.fn();
+    const controller = createShortcutController({ onAction });
+
+    document.addEventListener('keydown', controller.handle);
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        code: 'BracketRight',
+        composed: true,
+      }),
+    );
+    document.removeEventListener('keydown', controller.handle);
+
+    expect(onAction).not.toHaveBeenCalled();
+  });
 });

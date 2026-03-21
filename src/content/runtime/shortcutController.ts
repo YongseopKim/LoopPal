@@ -28,6 +28,17 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return false;
 }
 
+function hasEditableTarget(event: KeyboardEvent): boolean {
+  const targets = event.composedPath();
+  const fallbackTarget = event.target ?? document.activeElement;
+
+  if (targets.length === 0) {
+    return isEditableTarget(fallbackTarget);
+  }
+
+  return targets.some((target) => isEditableTarget(target));
+}
+
 export function createShortcutController({
   onAction,
 }: {
@@ -35,13 +46,11 @@ export function createShortcutController({
 }) {
   return {
     handle(event: KeyboardEvent) {
-      const target = event.target ?? document.activeElement;
-
       if (event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
 
-      if (isEditableTarget(target)) {
+      if (hasEditableTarget(event)) {
         return;
       }
 
