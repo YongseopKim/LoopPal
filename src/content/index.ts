@@ -99,6 +99,13 @@ function createBootstrapBinding(videoId: string | null) {
       videoId,
       isActive,
     });
+
+    await controller.start();
+
+    if (!isActive() || !controller.hasSession()) {
+      return;
+    }
+
     const shortcutController = createShortcutController({
       onAction(action) {
         void controller.handleShortcut(action);
@@ -112,12 +119,6 @@ function createBootstrapBinding(videoId: string | null) {
     removeKeydownListener = () => {
       document.removeEventListener('keydown', handleKeydown);
     };
-
-    await controller.start();
-
-    if (!isActive() || !controller.hasSession()) {
-      return;
-    }
 
     const loopMonitor = createLoopMonitor(player);
 

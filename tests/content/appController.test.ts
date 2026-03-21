@@ -258,4 +258,56 @@ describe('appController', () => {
       }),
     );
   });
+
+  it('serializes shortcut handling so later inputs win the final rendered state', async () => {
+    let resolvePlay: ((value: 'started' | 'blocked') => void) | null = null;
+    const store = {
+      load: vi.fn().mockResolvedValue({
+        ...seedSession,
+        loopEnabled: false,
+        activeSectionId: null,
+      }),
+      save: vi.fn(),
+    };
+    const player = fakePlayer({
+      playSafely: vi.fn().mockImplementation(
+        () =>
+          new Promise<'started' | 'blocked'>((resolve) => {
+            resolvePlay = resolve;
+          }),
+      ),
+    });
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+    store.save.mockClear();
+
+    const executePromise = controller.handleShortcut('executeSelectedSection');
+    await Promise.resolve();
+    const selectPromise = controller.handleShortcut('selectNextSection');
+
+    resolvePlay?.('started');
+
+    await Promise.all([executePromise, selectPromise]);
+
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        restoreStatus: 'idle',
+        selectedSectionName: 'Chorus',
+      }),
+    );
+    expect(store.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        activeSectionId: 'section-1',
+        selectedSectionId: 'section-2',
+      }),
+    );
+  });
 });

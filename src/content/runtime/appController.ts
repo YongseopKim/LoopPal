@@ -93,6 +93,7 @@ export function createAppController(deps: AppControllerDeps) {
   let session: VideoPracticeSession | null = null;
   let panelExpanded = false;
   let restoreStatus: RestoreStatus = 'idle';
+  let pendingShortcut: Promise<void> = Promise.resolve();
 
   const render = () => {
     if (!session) {
@@ -167,35 +168,43 @@ export function createAppController(deps: AppControllerDeps) {
       return { session, activeSection, restoreStatus };
     },
     async handleShortcut(action: ShortcutAction): Promise<void> {
-      if (!session || !isActive()) {
-        return;
-      }
+      const runShortcut = async () => {
+        if (!session || !isActive()) {
+          return;
+        }
 
-      if (action === 'togglePanel') {
-        panelExpanded = !panelExpanded;
+        if (action === 'togglePanel') {
+          panelExpanded = !panelExpanded;
+          render();
+          return;
+        }
+
+        session = reduceSession(session, { type: action });
+
+        if (action === 'executeSelectedSection') {
+          restoreStatus = await applySectionPlayback(getActiveSection(session), true);
+        } else {
+          restoreStatus = 'idle';
+        }
+
+        if (!isActive()) {
+          return;
+        }
+
+        await deps.store.save(session);
+
+        if (!isActive()) {
+          return;
+        }
+
         render();
-        return;
-      }
+      };
 
-      session = reduceSession(session, { type: action });
+      const nextRun = pendingShortcut.then(runShortcut);
 
-      if (action === 'executeSelectedSection') {
-        restoreStatus = await applySectionPlayback(getActiveSection(session), true);
-      } else {
-        restoreStatus = 'idle';
-      }
+      pendingShortcut = nextRun.catch(() => undefined);
 
-      if (!isActive()) {
-        return;
-      }
-
-      await deps.store.save(session);
-
-      if (!isActive()) {
-        return;
-      }
-
-      render();
+      await nextRun;
     },
     getLoopSection(): PracticeSection | null {
       if (!session || !session.loopEnabled) {
