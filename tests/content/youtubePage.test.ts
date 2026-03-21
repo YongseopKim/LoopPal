@@ -11,4 +11,14 @@ describe('youtubePage', () => {
       'abc123',
     );
   });
+
+  it('rejects watch pages with an empty video id', () => {
+    expect(isWatchPage('https://www.youtube.com/watch?v=')).toBe(false);
+    expect(extractVideoId('https://www.youtube.com/watch?v=')).toBeNull();
+  });
+
+  it('fails closed on malformed URLs', () => {
+    expect(isWatchPage('not a url')).toBe(false);
+    expect(extractVideoId('not a url')).toBeNull();
+  });
 });

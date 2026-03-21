@@ -1,13 +1,33 @@
 export function isWatchPage(rawUrl: string): boolean {
-  const url = new URL(rawUrl);
+  try {
+    const url = new URL(rawUrl);
+    const videoId = url.searchParams.get('v');
 
-  return (
-    url.hostname === 'www.youtube.com' &&
-    url.pathname === '/watch' &&
-    url.searchParams.has('v')
-  );
+    return (
+      url.hostname === 'www.youtube.com' &&
+      url.pathname === '/watch' &&
+      videoId !== null &&
+      videoId !== ''
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function extractVideoId(rawUrl: string): string | null {
-  return isWatchPage(rawUrl) ? new URL(rawUrl).searchParams.get('v') : null;
+  try {
+    const url = new URL(rawUrl);
+    const videoId = url.searchParams.get('v');
+
+    return (
+      url.hostname === 'www.youtube.com' &&
+      url.pathname === '/watch' &&
+      videoId !== null &&
+      videoId !== ''
+    )
+      ? videoId
+      : null;
+  } catch {
+    return null;
+  }
 }
