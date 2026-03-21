@@ -43,8 +43,16 @@ function fakePlayer(overrides: Partial<ReturnType<typeof basePlayer>> = {}) {
 function basePlayer() {
   return {
     currentTime: 0,
+    duration: 180.4,
+    playbackRate: 1,
     getCurrentTime: vi.fn(function getCurrentTime(this: { currentTime: number }) {
       return this.currentTime;
+    }),
+    getDuration: vi.fn(function getDuration(this: { duration: number }) {
+      return this.duration;
+    }),
+    getPlaybackRate: vi.fn(function getPlaybackRate(this: { playbackRate: number }) {
+      return this.playbackRate;
     }),
     setCurrentTime: vi.fn(),
     setPlaybackRate: vi.fn(),
@@ -59,6 +67,33 @@ function fakeOverlay() {
 }
 
 describe('appController', () => {
+  it('renders an empty practice state when there is no saved session', async () => {
+    const store = { load: vi.fn().mockResolvedValue(null), save: vi.fn() };
+    const player = fakePlayer({
+      playbackRate: 1.15,
+      getPlaybackRate: vi.fn().mockReturnValue(1.15),
+    });
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await expect(controller.start()).resolves.toBeNull();
+
+    expect(overlay.render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedSectionName: null,
+        activeSectionName: null,
+        loopEnabled: false,
+        sections: [],
+        speedLabel: '1.15x',
+      }),
+    );
+  });
+
   it('returns null without rendering when there is no saved session', async () => {
     const store = { load: vi.fn().mockResolvedValue(null), save: vi.fn() };
     const player = fakePlayer();
@@ -73,7 +108,176 @@ describe('appController', () => {
     await expect(controller.start()).resolves.toBeNull();
     expect(player.setPlaybackRate).not.toHaveBeenCalled();
     expect(player.playSafely).not.toHaveBeenCalled();
-    expect(overlay.render).not.toHaveBeenCalled();
+    expect(overlay.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates and selects a new section after marking start and end', async () => {
+    const store = { load: vi.fn().mockResolvedValue(null), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const promptForSectionDetails = vi.fn().mockReturnValue({
+      name: 'Intro riff',
+      memo: 'watch the ghost notes',
+    });
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+      createSectionId: () => 'section-new',
+      getNow: () => 123,
+      promptForSectionDetails,
+    });
+
+    await controller.start();
+
+    player.currentTime = 12.34;
+    await controller.handleShortcut('markSectionStart');
+    player.currentTime = 18.82;
+    await controller.handleShortcut('markSectionEnd');
+
+    expect(promptForSectionDetails).toHaveBeenCalledWith({
+      name: 'Section 1',
+      memo: '',
+    });
+    expect(store.save).toHaveBeenCalledWith({
+      videoId: 'abc123',
+      defaultSpeed: 1,
+      loopEnabled: false,
+      selectedSectionId: 'section-new',
+      activeSectionId: null,
+      sections: [
+        {
+          id: 'section-new',
+          name: 'Intro riff',
+          memo: 'watch the ghost notes',
+          startTimeSec: 12.3,
+          endTimeSec: 18.8,
+          speedOverride: null,
+          order: 0,
+          updatedAt: 123,
+        },
+      ],
+    });
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Intro riff',
+        activeSectionName: null,
+        loopEnabled: false,
+      }),
+    );
+  });
+
+  it('persists a default speed change even when the video has no saved session yet', async () => {
+    const store = { load: vi.fn().mockResolvedValue(null), save: vi.fn() };
+    const player = fakePlayer({
+      playbackRate: 0.8,
+      getPlaybackRate: vi.fn().mockReturnValue(0.8),
+    });
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    await controller.handleShortcut('increaseSpeed');
+
+    expect(player.setPlaybackRate).toHaveBeenCalledWith(0.85);
+    expect(store.save).toHaveBeenCalledWith({
+      videoId: 'abc123',
+      defaultSpeed: 0.85,
+      loopEnabled: false,
+      selectedSectionId: null,
+      activeSectionId: null,
+      sections: [],
+    });
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        speedLabel: '0.85x',
+      }),
+    );
+  });
+
+  it('nudges the selected section boundaries in 0.1s steps and persists the edits', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+      getNow: () => 999,
+    });
+
+    await controller.start();
+    player.setCurrentTime.mockClear();
+
+    await controller.handleShortcut('nudgeSectionStartForward');
+    await controller.handleShortcut('nudgeSectionEndBackward');
+
+    expect(player.setCurrentTime).toHaveBeenCalledWith(12.4);
+    expect(store.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sections: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'section-1',
+            startTimeSec: 12.4,
+            endTimeSec: 25.3,
+            updatedAt: 999,
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('stores a per-section speed override for the selected section', async () => {
+    const store = {
+      load: vi.fn().mockResolvedValue({
+        ...seedSession,
+        activeSectionId: null,
+        loopEnabled: false,
+        selectedSectionId: 'section-2',
+      }),
+      save: vi.fn(),
+    };
+    const player = fakePlayer({
+      playbackRate: 0.8,
+      getPlaybackRate: vi.fn().mockReturnValue(0.8),
+    });
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+      getNow: () => 555,
+    });
+
+    await controller.start();
+    await controller.handleShortcut('decreaseSpeed');
+
+    expect(player.setPlaybackRate).toHaveBeenCalledWith(0.75);
+    expect(store.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sections: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'section-2',
+            speedOverride: 0.75,
+            updatedAt: 555,
+          }),
+        ]),
+      }),
+    );
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Chorus',
+        speedLabel: '0.75x',
+      }),
+    );
   });
 
   it('restores a saved session and falls back cleanly when autoplay is blocked', async () => {

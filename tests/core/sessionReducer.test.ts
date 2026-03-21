@@ -89,6 +89,7 @@ describe('sessionReducer', () => {
 
     expect(next.sections).toHaveLength(3);
     expect(next.sections.at(-1)?.id).toBe('section-3');
+    expect(next.selectedSectionId).toBe('section-3');
   });
 
   it('rejects an 11th section', () => {

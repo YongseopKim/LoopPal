@@ -87,6 +87,7 @@ export function reduceSession(
 
       return {
         ...session,
+        selectedSectionId: action.payload.id,
         sections: [...session.sections, action.payload],
       };
     default:

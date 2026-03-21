@@ -1,6 +1,8 @@
 export function createYoutubePlayer(video: HTMLVideoElement) {
   return {
     getCurrentTime: () => video.currentTime,
+    getDuration: () => video.duration,
+    getPlaybackRate: () => video.playbackRate,
     setCurrentTime: (value: number) => {
       video.currentTime = value;
     },

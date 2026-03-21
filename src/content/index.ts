@@ -33,10 +33,6 @@ function sleep(ms: number) {
   });
 }
 
-function formatSpeedLabel(speed: number) {
-  return `${speed.toFixed(2).replace(/\.?0+$/, '')}x`;
-}
-
 function ensureOverlayRoot() {
   const existingRoot = document.querySelector('[data-bp-overlay-root]');
 
@@ -127,19 +123,6 @@ function createBootstrapBinding(
     await controller.start();
 
     if (!isActive()) {
-      return;
-    }
-
-    if (!controller.hasSession()) {
-      overlay.render({
-        selectedSectionName: null,
-        activeSectionName: null,
-        speedLabel: formatSpeedLabel(video.playbackRate),
-        loopEnabled: false,
-        panelExpanded: false,
-        restoreStatus: 'idle',
-        sections: [],
-      });
       return;
     }
 

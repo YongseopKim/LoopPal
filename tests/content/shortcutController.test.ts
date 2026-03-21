@@ -19,6 +19,15 @@ describe('shortcutController', () => {
     expect(onAction).toHaveBeenCalledWith('selectNextSection');
   });
 
+  it('routes the section start shortcut', () => {
+    const onAction = vi.fn();
+    const controller = createShortcutController({ onAction });
+
+    controller.handle(new KeyboardEvent('keydown', { code: 'Semicolon' }));
+
+    expect(onAction).toHaveBeenCalledWith('markSectionStart');
+  });
+
   it('ignores key presses inside text inputs', () => {
     const input = document.createElement('input');
     document.body.append(input);
