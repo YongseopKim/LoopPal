@@ -9,7 +9,7 @@ export function clampSectionRange(
   endTimeSec: number,
   durationSec: number,
 ) {
-  const maxTime = normalizeTime(durationSec);
+  const maxTime = Math.max(0, Math.floor(durationSec * 10) / 10);
   const start = Math.min(normalizeTime(startTimeSec), maxTime);
   const minEnd = Math.min(maxTime, start + 0.1);
   const end = Math.max(minEnd, Math.min(normalizeTime(endTimeSec), maxTime));

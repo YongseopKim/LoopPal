@@ -23,6 +23,11 @@ describe('sessionMath', () => {
       startTimeSec: 180.4,
       endTimeSec: 180.4,
     });
+
+    expect(clampSectionRange(181, 191.2, 180.45)).toEqual({
+      startTimeSec: 180.4,
+      endTimeSec: 180.4,
+    });
   });
 
   it('steps playback speed in 0.05x increments', () => {
