@@ -47,9 +47,21 @@ describe('session storage', () => {
     const storageArea = fakeStorage({ 'video:abc123': seedSession });
     const store = createSessionStore(storageArea);
 
-    await expect(store.load('abc123')).resolves.toMatchObject({
-      videoId: 'abc123',
-    });
+    await expect(store.load('abc123')).resolves.toEqual(seedSession);
+  });
+
+  it('strips runtime-only fields when loading a saved session', async () => {
+    const storageArea = fakeStorage({ 'video:abc123': dirtySession });
+    const store = createSessionStore(storageArea);
+
+    await expect(store.load('abc123')).resolves.toEqual(seedSession);
+  });
+
+  it('returns null when no session is stored for the video id', async () => {
+    const storageArea = fakeStorage();
+    const store = createSessionStore(storageArea);
+
+    await expect(store.load('missing')).resolves.toBeNull();
   });
 
   it('normalizes and saves sessions by video id', async () => {
@@ -59,11 +71,9 @@ describe('session storage', () => {
     await store.save(dirtySession);
 
     expect(storageArea.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        'video:abc123': expect.not.objectContaining({
-          resolvedSpeed: expect.any(Number),
-        }),
-      }),
+      {
+        'video:abc123': seedSession,
+      },
     );
   });
 });

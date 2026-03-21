@@ -16,8 +16,9 @@ export function createSessionStore(storageArea: StorageAreaLike) {
     async load(videoId: string): Promise<VideoPracticeSession | null> {
       const key = `video:${videoId}`;
       const result = await storageArea.get(key);
+      const session = result[key] as VideoPracticeSession | undefined;
 
-      return (result[key] as VideoPracticeSession | undefined) ?? null;
+      return session ? normalizeSession(session) : null;
     },
     async save(session: VideoPracticeSession): Promise<void> {
       const key = `video:${session.videoId}`;
