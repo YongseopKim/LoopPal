@@ -9,11 +9,12 @@ export function clampSectionRange(
   endTimeSec: number,
   durationSec: number,
 ) {
-  const start = Math.min(normalizeTime(startTimeSec), durationSec);
-  const minEnd = Math.min(durationSec, start + 0.1);
-  const end = Math.max(minEnd, Math.min(normalizeTime(endTimeSec), durationSec));
+  const maxTime = normalizeTime(durationSec);
+  const start = Math.min(normalizeTime(startTimeSec), maxTime);
+  const minEnd = Math.min(maxTime, start + 0.1);
+  const end = Math.max(minEnd, Math.min(normalizeTime(endTimeSec), maxTime));
 
-  return { startTimeSec: start, endTimeSec: normalizeTime(end) };
+  return { startTimeSec: normalizeTime(start), endTimeSec: normalizeTime(end) };
 }
 
 export function stepSpeed(currentSpeed: number, direction: -1 | 1): number {

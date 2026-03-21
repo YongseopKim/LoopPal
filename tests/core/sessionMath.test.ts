@@ -18,6 +18,13 @@ describe('sessionMath', () => {
     });
   });
 
+  it('normalizes clamped ranges when duration is not on a tenth', () => {
+    expect(clampSectionRange(181, 191.2, 180.44)).toEqual({
+      startTimeSec: 180.4,
+      endTimeSec: 180.4,
+    });
+  });
+
   it('steps playback speed in 0.05x increments', () => {
     expect(stepSpeed(0.75, 1)).toBe(0.8);
     expect(stepSpeed(0.75, -1)).toBe(0.7);
