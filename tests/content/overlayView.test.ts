@@ -27,6 +27,7 @@ describe('overlayView', () => {
 
     expect(root.textContent).toContain('Chorus groove');
     expect(root.textContent).toContain('0.75x');
+    expect(root.querySelector('.bp-overlay__panel')).toBeNull();
   });
 
   it('shows the saved section list when expanded', () => {
@@ -35,6 +36,7 @@ describe('overlayView', () => {
 
     view.render({ ...viewModel, panelExpanded: true });
 
+    expect(root.querySelector('.bp-overlay__panel')).not.toBeNull();
     expect(root.textContent).toContain('memo: mute on beat 4');
   });
 });

@@ -1,10 +1,8 @@
 .bp-overlay {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 2147483647;
+  display: inline-flex;
+  flex-direction: column;
   min-width: 240px;
-  max-width: 320px;
+  max-width: min(320px, 100%);
   font-family:
     'Avenir Next',
     Avenir,
@@ -27,8 +25,12 @@
 }
 
 .bp-overlay__section-label {
+  display: block;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bp-overlay__speed,
