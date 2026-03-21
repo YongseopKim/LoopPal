@@ -32,6 +32,20 @@ describe('sessionMath', () => {
     });
   });
 
+  it('treats epsilon-scale float noise below a tenth as the intended end bound', () => {
+    expect(clampSectionRange(181, 191.2, 180.39999999999998)).toEqual({
+      startTimeSec: 180.3,
+      endTimeSec: 180.4,
+    });
+  });
+
+  it('treats epsilon-scale float noise near 0.1s as a valid minimum section', () => {
+    expect(clampSectionRange(1, 1, 0.09999999999999999)).toEqual({
+      startTimeSec: 0,
+      endTimeSec: 0.1,
+    });
+  });
+
   it('repairs reversed ranges to a valid minimum section', () => {
     expect(clampSectionRange(10.4, 10.3, 180.4)).toEqual({
       startTimeSec: 10.4,

@@ -1,7 +1,13 @@
 export type { PracticeSection, VideoPracticeSession } from './types';
 
+const DURATION_EPSILON = 1e-9;
+
 export function normalizeTime(value: number): number {
   return Math.max(0, Math.round(value * 10) / 10);
+}
+
+function normalizeDurationLimit(durationSec: number): number {
+  return Math.floor((Math.max(0, durationSec) + DURATION_EPSILON) * 10) / 10;
 }
 
 export function clampSectionRange(
@@ -9,7 +15,7 @@ export function clampSectionRange(
   endTimeSec: number,
   durationSec: number,
 ) {
-  const maxTime = Math.max(0, Math.floor(durationSec * 10) / 10);
+  const maxTime = normalizeDurationLimit(durationSec);
   const canFitMinimumSection = maxTime >= 0.1;
   const maxStart = canFitMinimumSection ? maxTime - 0.1 : maxTime;
   const start = Math.min(normalizeTime(startTimeSec), maxStart);
