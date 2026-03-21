@@ -51,6 +51,7 @@ function createBootstrapBinding(videoId: string | null) {
   let loopTimer: number | null = null;
   let disposed = false;
   let removeKeydownListener: (() => void) | null = null;
+  let removePlaybackListener: (() => void) | null = null;
 
   const isActive = () =>
     !disposed &&
@@ -68,6 +69,8 @@ function createBootstrapBinding(videoId: string | null) {
 
     removeKeydownListener?.();
     removeKeydownListener = null;
+    removePlaybackListener?.();
+    removePlaybackListener = null;
     clearOverlayRoot();
   };
 
@@ -119,11 +122,18 @@ function createBootstrapBinding(videoId: string | null) {
         void controller.handleShortcut(action).catch(reportRuntimeError);
       },
     });
+    const handlePlaybackStart = () => {
+      controller.markPlaybackStarted();
+    };
     const handleKeydown = (event: KeyboardEvent) => {
       shortcutController.handle(event);
     };
 
+    video.addEventListener('play', handlePlaybackStart);
     document.addEventListener('keydown', handleKeydown);
+    removePlaybackListener = () => {
+      video.removeEventListener('play', handlePlaybackStart);
+    };
     removeKeydownListener = () => {
       document.removeEventListener('keydown', handleKeydown);
     };

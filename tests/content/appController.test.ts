@@ -97,6 +97,38 @@ describe('appController', () => {
     );
   });
 
+  it('keeps a blocked restore hint until playback actually resumes', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer({
+      playSafely: vi.fn().mockResolvedValue('blocked' as const),
+    });
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+
+    await controller.handleShortcut('selectNextSection');
+
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        restoreStatus: 'blocked',
+        selectedSectionName: 'Chorus',
+      }),
+    );
+
+    controller.markPlaybackStarted();
+
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({ restoreStatus: 'started' }),
+    );
+  });
+
   it('does not autoplay when looping is enabled but the saved section ids are stale', async () => {
     const store = {
       load: vi.fn().mockResolvedValue({
@@ -332,8 +364,9 @@ describe('appController', () => {
 
     expect(overlay.render).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        restoreStatus: 'idle',
+        restoreStatus: 'started',
         selectedSectionName: 'Chorus',
+        activeSectionName: 'Verse',
       }),
     );
     expect(store.save).toHaveBeenLastCalledWith(

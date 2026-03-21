@@ -184,8 +184,6 @@ export function createAppController(deps: AppControllerDeps) {
 
         if (action === 'executeSelectedSection') {
           restoreStatus = await applySectionPlayback(getActiveSection(session), true);
-        } else {
-          restoreStatus = 'idle';
         }
 
         if (!isActive()) {
@@ -216,6 +214,14 @@ export function createAppController(deps: AppControllerDeps) {
     },
     hasSession(): boolean {
       return session !== null;
+    },
+    markPlaybackStarted(): void {
+      if (!session || !session.loopEnabled || restoreStatus !== 'blocked') {
+        return;
+      }
+
+      restoreStatus = 'started';
+      render();
     },
   };
 }
