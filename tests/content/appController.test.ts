@@ -151,11 +151,19 @@ describe('appController', () => {
     await controller.start();
 
     expect(player.playSafely).not.toHaveBeenCalled();
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeSectionId: null,
+        loopEnabled: false,
+        selectedSectionId: null,
+      }),
+    );
     expect(overlay.render).toHaveBeenCalledWith(
       expect.objectContaining({
         restoreStatus: 'idle',
         selectedSectionName: null,
         activeSectionName: null,
+        loopEnabled: false,
       }),
     );
   });

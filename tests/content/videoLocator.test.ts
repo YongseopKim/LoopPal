@@ -5,12 +5,16 @@ import {
 } from '../../src/content/runtime/videoLocator';
 
 describe('videoLocator', () => {
-  it('prefers the main YouTube player video element', () => {
-    const teaserVideo = document.createElement('video');
+  it('prefers the scoped watch-player video element over other page videos', () => {
+    const unrelatedVideo = document.createElement('video');
+    const moviePlayer = document.createElement('div');
     const mainPlayerVideo = document.createElement('video');
 
+    unrelatedVideo.className = 'html5-main-video';
+    moviePlayer.id = 'movie_player';
     mainPlayerVideo.className = 'html5-main-video';
-    document.body.append(teaserVideo, mainPlayerVideo);
+    moviePlayer.append(mainPlayerVideo);
+    document.body.append(unrelatedVideo, moviePlayer);
 
     expect(findWatchPlayerVideo(document)).toBe(mainPlayerVideo);
   });

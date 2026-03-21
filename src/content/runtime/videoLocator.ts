@@ -10,7 +10,11 @@ const DEFAULT_INTERVAL_MS = 50;
 const DEFAULT_MAX_ATTEMPTS = null;
 
 export function findWatchPlayerVideo(root: ParentNode): HTMLVideoElement | null {
-  const selectors = ['video.html5-main-video', '#movie_player video'];
+  const selectors = [
+    '#movie_player video.html5-main-video',
+    '#movie_player video',
+    'video.html5-main-video',
+  ];
 
   for (const selector of selectors) {
     const candidate = root.querySelector(selector);

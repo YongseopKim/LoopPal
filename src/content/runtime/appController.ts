@@ -56,6 +56,34 @@ function getActiveSection(session: VideoPracticeSession): PracticeSection | null
   return getSectionById(session, session.activeSectionId);
 }
 
+function normalizeSessionState(
+  session: VideoPracticeSession,
+): VideoPracticeSession {
+  const selectedSection = getSelectedSection(session);
+  const activeSection = getActiveSection(session);
+  let changed = false;
+  let nextSession = session;
+
+  if (session.selectedSectionId && !selectedSection) {
+    changed = true;
+    nextSession = {
+      ...nextSession,
+      selectedSectionId: null,
+    };
+  }
+
+  if (session.activeSectionId && !activeSection) {
+    changed = true;
+    nextSession = {
+      ...nextSession,
+      activeSectionId: null,
+      loopEnabled: false,
+    };
+  }
+
+  return changed ? nextSession : session;
+}
+
 function formatSpeedLabel(speed: number): string {
   return `${speed.toFixed(2).replace(/\.?0+$/, '')}x`;
 }
@@ -153,6 +181,17 @@ export function createAppController(deps: AppControllerDeps) {
 
       if (!session || !isActive()) {
         return null;
+      }
+
+      const normalizedSession = normalizeSessionState(session);
+
+      if (normalizedSession !== session) {
+        session = normalizedSession;
+        await deps.store.save(session);
+
+        if (!isActive()) {
+          return null;
+        }
       }
 
       const activeSection = getActiveSection(session);
