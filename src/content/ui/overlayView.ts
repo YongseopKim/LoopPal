@@ -9,6 +9,7 @@ export type OverlayViewModel = {
   speedLabel: string;
   loopEnabled: boolean;
   panelExpanded: boolean;
+  restoreStatus?: 'idle' | 'started' | 'blocked';
   sections: OverlaySectionSummary[];
 };
 
@@ -52,12 +53,18 @@ function renderPanel(model: OverlayViewModel): string {
 export function createOverlayView(root: HTMLElement) {
   return {
     render(model: OverlayViewModel) {
+      const restoreLabel =
+        model.restoreStatus === 'blocked'
+          ? '<span class="bp-overlay__restore">Tap play to resume loop</span>'
+          : '';
+
       root.innerHTML = `
         <div class="bp-overlay">
           <div class="bp-overlay__bar">
             <strong class="bp-overlay__section-label">${escapeHtml(model.selectedSectionName ?? 'No section selected')}</strong>
             <span class="bp-overlay__speed">${escapeHtml(model.speedLabel)}</span>
             <span class="bp-overlay__loop">${model.loopEnabled ? 'Loop on' : 'Loop off'}</span>
+            ${restoreLabel}
           </div>
           ${model.panelExpanded ? renderPanel(model) : ''}
         </div>
