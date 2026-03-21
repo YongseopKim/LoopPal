@@ -2,7 +2,10 @@ import { createSessionStore } from '../core/session/storage';
 import { createAppController } from './runtime/appController';
 import { createLoopMonitor } from './runtime/loopMonitor';
 import { createShortcutController } from './runtime/shortcutController';
-import { waitForVideoElement } from './runtime/videoLocator';
+import {
+  findWatchPlayerVideo,
+  waitForVideoElement,
+} from './runtime/videoLocator';
 import {
   extractVideoId,
   isWatchPage,
@@ -26,6 +29,10 @@ function sleep(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function formatSpeedLabel(speed: number) {
+  return `${speed.toFixed(2).replace(/\.?0+$/, '')}x`;
 }
 
 function ensureOverlayRoot() {
@@ -80,11 +87,7 @@ function createBootstrapBinding(videoId: string | null) {
 
   const bootstrap = async () => {
     const video = await waitForVideoElement({
-      findVideo: () => {
-        const candidate = document.querySelector('video');
-
-        return candidate instanceof HTMLVideoElement ? candidate : null;
-      },
+      findVideo: () => findWatchPlayerVideo(document),
       isActive,
       sleep,
       intervalMs: VIDEO_LOOKUP_INTERVAL_MS,
@@ -113,7 +116,20 @@ function createBootstrapBinding(videoId: string | null) {
 
     await controller.start();
 
-    if (!isActive() || !controller.hasSession()) {
+    if (!isActive()) {
+      return;
+    }
+
+    if (!controller.hasSession()) {
+      overlay.render({
+        selectedSectionName: null,
+        activeSectionName: null,
+        speedLabel: formatSpeedLabel(video.playbackRate),
+        loopEnabled: false,
+        panelExpanded: false,
+        restoreStatus: 'idle',
+        sections: [],
+      });
       return;
     }
 

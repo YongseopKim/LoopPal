@@ -9,6 +9,20 @@ type WaitForVideoElementArgs = {
 const DEFAULT_INTERVAL_MS = 50;
 const DEFAULT_MAX_ATTEMPTS = null;
 
+export function findWatchPlayerVideo(root: ParentNode): HTMLVideoElement | null {
+  const selectors = ['video.html5-main-video', '#movie_player video'];
+
+  for (const selector of selectors) {
+    const candidate = root.querySelector(selector);
+
+    if (candidate instanceof HTMLVideoElement) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 export async function waitForVideoElement({
   findVideo,
   isActive,

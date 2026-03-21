@@ -1,7 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import { waitForVideoElement } from '../../src/content/runtime/videoLocator';
+import {
+  findWatchPlayerVideo,
+  waitForVideoElement,
+} from '../../src/content/runtime/videoLocator';
 
 describe('videoLocator', () => {
+  it('prefers the main YouTube player video element', () => {
+    const teaserVideo = document.createElement('video');
+    const mainPlayerVideo = document.createElement('video');
+
+    mainPlayerVideo.className = 'html5-main-video';
+    document.body.append(teaserVideo, mainPlayerVideo);
+
+    expect(findWatchPlayerVideo(document)).toBe(mainPlayerVideo);
+  });
+
   it('retries until a video element appears', async () => {
     const video = document.createElement('video');
     const sleep = vi.fn().mockResolvedValue(undefined);
