@@ -16,5 +16,6 @@ export type VideoPracticeSession = {
   selectedSectionId: string | null;
   activeSectionId: string | null;
   sections: PracticeSection[];
+  // Runtime-only derived value; do not persist in stored session data.
   resolvedSpeed?: number;
 };

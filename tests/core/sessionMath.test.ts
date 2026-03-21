@@ -32,8 +32,20 @@ describe('sessionMath', () => {
     });
   });
 
+  it('repairs reversed ranges to a valid minimum section', () => {
+    expect(clampSectionRange(10.4, 10.3, 180.4)).toEqual({
+      startTimeSec: 10.4,
+      endTimeSec: 10.5,
+    });
+  });
+
   it('steps playback speed in 0.05x increments', () => {
     expect(stepSpeed(0.75, 1)).toBe(0.8);
     expect(stepSpeed(0.75, -1)).toBe(0.7);
+  });
+
+  it('clamps playback speed at the supported min and max', () => {
+    expect(stepSpeed(2, 1)).toBe(2);
+    expect(stepSpeed(0.25, -1)).toBe(0.25);
   });
 });
