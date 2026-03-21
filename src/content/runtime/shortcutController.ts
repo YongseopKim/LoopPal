@@ -3,11 +3,29 @@ import {
   type ShortcutAction,
 } from './defaultKeymap';
 
-function isTextInputTarget(target: EventTarget | null): target is HTMLElement {
-  return (
-    target instanceof HTMLElement &&
-    ['INPUT', 'TEXTAREA'].includes(target.tagName)
-  );
+function isEditableTarget(target: EventTarget | null): boolean {
+  let element =
+    target instanceof HTMLElement
+      ? target
+      : target instanceof Node
+        ? target.parentElement
+        : null;
+
+  while (element) {
+    const contentEditable = element.getAttribute('contenteditable');
+
+    if (
+      ['INPUT', 'TEXTAREA'].includes(element.tagName) ||
+      element.isContentEditable ||
+      (contentEditable !== null && contentEditable.toLowerCase() !== 'false')
+    ) {
+      return true;
+    }
+
+    element = element.parentElement;
+  }
+
+  return false;
 }
 
 export function createShortcutController({
@@ -19,7 +37,11 @@ export function createShortcutController({
     handle(event: KeyboardEvent) {
       const target = event.target ?? document.activeElement;
 
-      if (isTextInputTarget(target)) {
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (isEditableTarget(target)) {
         return;
       }
 
