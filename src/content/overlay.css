@@ -1,1 +1,84 @@
-/* Placeholder overlay styles for the bootstrap shell. */
+.bp-overlay {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483647;
+  min-width: 240px;
+  max-width: 320px;
+  font-family:
+    'Avenir Next',
+    Avenir,
+    'Segoe UI',
+    sans-serif;
+  color: #f8f5ec;
+}
+
+.bp-overlay__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(18, 25, 36, 0.96), rgba(48, 32, 18, 0.96));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  font-size: 13px;
+}
+
+.bp-overlay__section-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.bp-overlay__speed,
+.bp-overlay__loop {
+  white-space: nowrap;
+  opacity: 0.82;
+}
+
+.bp-overlay__panel {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(15, 19, 28, 0.96);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+}
+
+.bp-overlay__panel-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.bp-overlay__sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bp-overlay__section {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.bp-overlay__section-name,
+.bp-overlay__section-memo,
+.bp-overlay__empty {
+  margin: 0;
+}
+
+.bp-overlay__section-memo,
+.bp-overlay__empty {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
