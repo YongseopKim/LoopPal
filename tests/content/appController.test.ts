@@ -49,6 +49,23 @@ function fakeOverlay() {
 }
 
 describe('appController', () => {
+  it('returns null without rendering when there is no saved session', async () => {
+    const store = { load: vi.fn().mockResolvedValue(null), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await expect(controller.start()).resolves.toBeNull();
+    expect(player.setPlaybackRate).not.toHaveBeenCalled();
+    expect(player.playSafely).not.toHaveBeenCalled();
+    expect(overlay.render).not.toHaveBeenCalled();
+  });
+
   it('restores a saved session and falls back cleanly when autoplay is blocked', async () => {
     const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
     const player = fakePlayer({ playSafely: vi.fn().mockResolvedValue('blocked' as const) });
