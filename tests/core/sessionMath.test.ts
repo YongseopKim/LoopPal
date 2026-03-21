@@ -18,14 +18,16 @@ describe('sessionMath', () => {
     });
   });
 
-  it('normalizes clamped ranges when duration is not on a tenth', () => {
+  it('keeps a valid 0.1s section at the end when duration floors below the real bound', () => {
     expect(clampSectionRange(181, 191.2, 180.44)).toEqual({
-      startTimeSec: 180.4,
+      startTimeSec: 180.3,
       endTimeSec: 180.4,
     });
+  });
 
+  it('keeps a valid 0.1s section at the end when duration is above the floored tenth', () => {
     expect(clampSectionRange(181, 191.2, 180.45)).toEqual({
-      startTimeSec: 180.4,
+      startTimeSec: 180.3,
       endTimeSec: 180.4,
     });
   });
