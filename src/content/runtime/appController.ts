@@ -88,10 +88,11 @@ export function createAppController(deps: AppControllerDeps) {
 
       const activeSection = getActiveSection(session);
       const speed = activeSection?.speedOverride ?? session.defaultSpeed;
+      const canRestoreLoop = session.loopEnabled && activeSection !== null;
 
       deps.player.setPlaybackRate(speed);
 
-      const restoreStatus = session.loopEnabled
+      const restoreStatus = canRestoreLoop
         ? await deps.player.playSafely()
         : ('idle' as const);
 

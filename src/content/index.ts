@@ -1,9 +1,15 @@
 import { createSessionStore } from '../core/session/storage';
 import { createAppController } from './runtime/appController';
 import { createLoopMonitor } from './runtime/loopMonitor';
-import { extractVideoId, isWatchPage } from './runtime/youtubePage';
+import {
+  extractVideoId,
+  isWatchPage,
+  subscribeToPageNavigations,
+} from './runtime/youtubePage';
 import { createYoutubePlayer } from './runtime/youtubePlayer';
 import { createOverlayView } from './ui/overlayView';
+
+const LOOP_MONITOR_INTERVAL_MS = 50;
 
 function ensureOverlayRoot() {
   const existingRoot = document.querySelector('[data-bp-overlay-root]');
@@ -20,38 +26,69 @@ function ensureOverlayRoot() {
   return root;
 }
 
-async function bootstrap() {
-  if (!isWatchPage(window.location.href)) {
-    return;
-  }
+function clearOverlayRoot() {
+  ensureOverlayRoot().innerHTML = '';
+}
 
-  const videoId = extractVideoId(window.location.href);
+function createBootstrapBinding(videoId: string | null) {
+  let loopTimer: number | null = null;
+  let disposed = false;
 
-  if (!videoId) {
-    return;
+  const stop = () => {
+    disposed = true;
+
+    if (loopTimer !== null) {
+      window.clearInterval(loopTimer);
+      loopTimer = null;
+    }
+
+    clearOverlayRoot();
+  };
+
+  if (!videoId || !isWatchPage(window.location.href)) {
+    return { videoId, stop };
   }
 
   const video = document.querySelector('video');
 
   if (!(video instanceof HTMLVideoElement)) {
-    return;
+    return { videoId, stop };
   }
 
-  const store = createSessionStore(chrome.storage.local);
-  const player = createYoutubePlayer(video);
-  const overlay = createOverlayView(ensureOverlayRoot());
-  const controller = createAppController({ store, player, overlay, videoId });
-  const restored = await controller.start();
+  const bootstrap = async () => {
+    const store = createSessionStore(chrome.storage.local);
+    const player = createYoutubePlayer(video);
+    const overlay = createOverlayView(ensureOverlayRoot());
+    const controller = createAppController({ store, player, overlay, videoId });
+    const restored = await controller.start();
 
-  if (!restored?.activeSection || !restored.session.loopEnabled) {
-    return;
-  }
+    if (disposed || !restored?.activeSection || !restored.session.loopEnabled) {
+      return;
+    }
 
-  const loopMonitor = createLoopMonitor(player);
+    const loopMonitor = createLoopMonitor(player);
 
-  window.setInterval(() => {
-    loopMonitor.tick(restored.activeSection);
-  }, 250);
+    loopTimer = window.setInterval(() => {
+      loopMonitor.tick(restored.activeSection);
+    }, LOOP_MONITOR_INTERVAL_MS);
+  };
+
+  void bootstrap();
+
+  return { videoId, stop };
 }
 
-void bootstrap();
+let binding = createBootstrapBinding(extractVideoId(window.location.href));
+
+const unsubscribeFromNavigations = subscribeToPageNavigations(window, (url) => {
+  const nextVideoId = extractVideoId(url);
+
+  if (nextVideoId === binding.videoId) {
+    return;
+  }
+
+  binding.stop();
+  binding = createBootstrapBinding(nextVideoId);
+});
+
+void unsubscribeFromNavigations;

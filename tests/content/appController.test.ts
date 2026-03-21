@@ -69,6 +69,36 @@ describe('appController', () => {
     );
   });
 
+  it('does not autoplay when looping is enabled but the saved section ids are stale', async () => {
+    const store = {
+      load: vi.fn().mockResolvedValue({
+        ...seedSession,
+        selectedSectionId: 'missing-section',
+        activeSectionId: 'missing-section',
+      }),
+      save: vi.fn(),
+    };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+
+    expect(player.playSafely).not.toHaveBeenCalled();
+    expect(overlay.render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        restoreStatus: 'idle',
+        selectedSectionName: null,
+      }),
+    );
+  });
+
   it('seeks back to the loop start when playback crosses the loop end', () => {
     const player = fakePlayer({ currentTime: 20.2 });
     const monitor = createLoopMonitor(player);
