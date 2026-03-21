@@ -72,6 +72,14 @@ function normalizeSessionState(
     };
   }
 
+  if (session.loopEnabled && session.activeSectionId === null) {
+    changed = true;
+    nextSession = {
+      ...nextSession,
+      loopEnabled: false,
+    };
+  }
+
   if (session.activeSectionId && !activeSection) {
     changed = true;
     nextSession = {

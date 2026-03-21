@@ -1,10 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   findWatchPlayerVideo,
   waitForVideoElement,
 } from '../../src/content/runtime/videoLocator';
 
 describe('videoLocator', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
   it('prefers the scoped watch-player video element over other page videos', () => {
     const unrelatedVideo = document.createElement('video');
     const moviePlayer = document.createElement('div');
@@ -17,6 +21,66 @@ describe('videoLocator', () => {
     document.body.append(unrelatedVideo, moviePlayer);
 
     expect(findWatchPlayerVideo(document)).toBe(mainPlayerVideo);
+  });
+
+  it('waits for the watch-player source to change before reusing the same video element', () => {
+    const moviePlayer = document.createElement('div');
+    const mainPlayerVideo = document.createElement('video');
+
+    moviePlayer.id = 'movie_player';
+    mainPlayerVideo.className = 'html5-main-video';
+    Object.defineProperty(mainPlayerVideo, 'currentSrc', {
+      configurable: true,
+      value: 'https://cdn.test/old.mp4',
+    });
+    moviePlayer.append(mainPlayerVideo);
+    document.body.append(moviePlayer);
+
+    expect(
+      findWatchPlayerVideo(document, {
+        element: mainPlayerVideo,
+        currentSrc: 'https://cdn.test/old.mp4',
+      }),
+    ).toBeNull();
+
+    Object.defineProperty(mainPlayerVideo, 'currentSrc', {
+      configurable: true,
+      value: 'https://cdn.test/new.mp4',
+    });
+
+    expect(
+      findWatchPlayerVideo(document, {
+        element: mainPlayerVideo,
+        currentSrc: 'https://cdn.test/old.mp4',
+      }),
+    ).toBe(mainPlayerVideo);
+  });
+
+  it('skips a stale watch-player video when a replacement video is already present', () => {
+    const moviePlayer = document.createElement('div');
+    const staleVideo = document.createElement('video');
+    const replacementVideo = document.createElement('video');
+
+    moviePlayer.id = 'movie_player';
+    staleVideo.className = 'html5-main-video';
+    replacementVideo.className = 'html5-main-video';
+    Object.defineProperty(staleVideo, 'currentSrc', {
+      configurable: true,
+      value: 'https://cdn.test/old.mp4',
+    });
+    Object.defineProperty(replacementVideo, 'currentSrc', {
+      configurable: true,
+      value: 'https://cdn.test/new.mp4',
+    });
+    moviePlayer.append(staleVideo, replacementVideo);
+    document.body.append(moviePlayer);
+
+    expect(
+      findWatchPlayerVideo(document, {
+        element: staleVideo,
+        currentSrc: 'https://cdn.test/old.mp4',
+      }),
+    ).toBe(replacementVideo);
   });
 
   it('retries until a video element appears', async () => {

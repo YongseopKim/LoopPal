@@ -168,6 +168,45 @@ describe('appController', () => {
     );
   });
 
+  it('normalizes loop-enabled restore state when no active section is persisted', async () => {
+    const store = {
+      load: vi.fn().mockResolvedValue({
+        ...seedSession,
+        activeSectionId: null,
+        loopEnabled: true,
+        selectedSectionId: 'section-1',
+      }),
+      save: vi.fn(),
+    };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+
+    expect(player.playSafely).not.toHaveBeenCalled();
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeSectionId: null,
+        loopEnabled: false,
+        selectedSectionId: 'section-1',
+      }),
+    );
+    expect(overlay.render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Verse',
+        activeSectionName: null,
+        loopEnabled: false,
+        restoreStatus: 'idle',
+      }),
+    );
+  });
+
   it('keeps the playback speed label at the current speed when only a section is selected on restore', async () => {
     const store = {
       load: vi.fn().mockResolvedValue({

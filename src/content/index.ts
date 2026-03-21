@@ -3,6 +3,7 @@ import { createAppController } from './runtime/appController';
 import { createLoopMonitor } from './runtime/loopMonitor';
 import { createShortcutController } from './runtime/shortcutController';
 import {
+  type BoundVideoState,
   findWatchPlayerVideo,
   waitForVideoElement,
 } from './runtime/videoLocator';
@@ -54,7 +55,10 @@ function clearOverlayRoot() {
   ensureOverlayRoot().innerHTML = '';
 }
 
-function createBootstrapBinding(videoId: string | null) {
+function createBootstrapBinding(
+  videoId: string | null,
+  previousVideoState: BoundVideoState,
+) {
   let loopTimer: number | null = null;
   let disposed = false;
   let removeKeydownListener: (() => void) | null = null;
@@ -87,7 +91,7 @@ function createBootstrapBinding(videoId: string | null) {
 
   const bootstrap = async () => {
     const video = await waitForVideoElement({
-      findVideo: () => findWatchPlayerVideo(document),
+      findVideo: () => findWatchPlayerVideo(document, previousVideoState),
       isActive,
       sleep,
       intervalMs: VIDEO_LOOKUP_INTERVAL_MS,
@@ -96,6 +100,11 @@ function createBootstrapBinding(videoId: string | null) {
     if (!(video instanceof HTMLVideoElement) || !isActive()) {
       return;
     }
+
+    lastBoundVideoState = {
+      element: video,
+      currentSrc: video.currentSrc,
+    };
 
     const store = createSessionStore(chrome.storage.local);
     const player = createYoutubePlayer(video);
@@ -170,7 +179,11 @@ function createBootstrapBinding(videoId: string | null) {
   return { videoId, stop };
 }
 
-let binding = createBootstrapBinding(extractVideoId(window.location.href));
+let lastBoundVideoState: BoundVideoState = { element: null, currentSrc: '' };
+let binding = createBootstrapBinding(
+  extractVideoId(window.location.href),
+  lastBoundVideoState,
+);
 
 const unsubscribeFromNavigations = subscribeToPageNavigations(window, (url) => {
   const nextVideoId = extractVideoId(url);
@@ -180,7 +193,7 @@ const unsubscribeFromNavigations = subscribeToPageNavigations(window, (url) => {
   }
 
   binding.stop();
-  binding = createBootstrapBinding(nextVideoId);
+  binding = createBootstrapBinding(nextVideoId, lastBoundVideoState);
 });
 
 void unsubscribeFromNavigations;

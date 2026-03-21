@@ -9,17 +9,40 @@ type WaitForVideoElementArgs = {
 const DEFAULT_INTERVAL_MS = 50;
 const DEFAULT_MAX_ATTEMPTS = null;
 
-export function findWatchPlayerVideo(root: ParentNode): HTMLVideoElement | null {
+export type BoundVideoState = {
+  element: HTMLVideoElement | null;
+  currentSrc: string;
+};
+
+export function findWatchPlayerVideo(
+  root: ParentNode,
+  previousVideoState?: BoundVideoState,
+): HTMLVideoElement | null {
   const selectors = [
     '#movie_player video.html5-main-video',
     '#movie_player video',
     'video.html5-main-video',
   ];
+  const visitedCandidates = new Set<HTMLVideoElement>();
 
   for (const selector of selectors) {
-    const candidate = root.querySelector(selector);
+    const candidates = root.querySelectorAll(selector);
 
-    if (candidate instanceof HTMLVideoElement) {
+    for (const candidate of candidates) {
+      if (!(candidate instanceof HTMLVideoElement) || visitedCandidates.has(candidate)) {
+        continue;
+      }
+
+      visitedCandidates.add(candidate);
+
+      if (
+        previousVideoState &&
+        previousVideoState.element === candidate &&
+        candidate.currentSrc === previousVideoState.currentSrc
+      ) {
+        continue;
+      }
+
       return candidate;
     }
   }
