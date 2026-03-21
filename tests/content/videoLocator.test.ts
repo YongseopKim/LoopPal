@@ -42,4 +42,25 @@ describe('videoLocator', () => {
 
     expect(findVideo).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps retrying by default until a video element appears', async () => {
+    const video = document.createElement('video');
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    let attempts = 0;
+    const findVideo = vi.fn<() => HTMLVideoElement | null>().mockImplementation(() => {
+      attempts += 1;
+      return attempts > 40 ? video : null;
+    });
+
+    await expect(
+      waitForVideoElement({
+        findVideo,
+        isActive: () => true,
+        sleep,
+      }),
+    ).resolves.toBe(video);
+
+    expect(findVideo).toHaveBeenCalledTimes(41);
+    expect(sleep).toHaveBeenCalledTimes(40);
+  });
 });

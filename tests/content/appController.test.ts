@@ -80,6 +80,7 @@ describe('appController', () => {
 
     await controller.start();
 
+    expect(player.setCurrentTime).toHaveBeenCalledWith(12.3);
     expect(player.setPlaybackRate).toHaveBeenCalledWith(0.65);
     expect(overlay.render).toHaveBeenCalledWith(
       expect.objectContaining({ restoreStatus: 'blocked' }),
@@ -146,6 +147,48 @@ describe('appController', () => {
     await expect(startPromise).resolves.toBeNull();
     expect(player.setPlaybackRate).not.toHaveBeenCalled();
     expect(player.playSafely).not.toHaveBeenCalled();
+    expect(overlay.render).not.toHaveBeenCalled();
+  });
+
+  it('treats teardown-time autoplay aborts as a cancelled restore', async () => {
+    let active = true;
+    let resolvePlayStarted: (() => void) | null = null;
+    let rejectPlay:
+      | ((reason?: DOMException) => void)
+      | null = null;
+    const playStarted = new Promise<void>((resolve) => {
+      resolvePlayStarted = resolve;
+    });
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer({
+      playSafely: vi.fn().mockImplementation(
+        () => {
+          resolvePlayStarted?.();
+
+          return (
+          new Promise<'started' | 'blocked'>((_resolve, reject) => {
+            rejectPlay = reject;
+          })
+          );
+        },
+      ),
+    });
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+      isActive: () => active,
+    });
+
+    const startPromise = controller.start();
+
+    await playStarted;
+    active = false;
+    rejectPlay?.(new DOMException('aborted', 'AbortError'));
+
+    await expect(startPromise).resolves.toBeNull();
     expect(overlay.render).not.toHaveBeenCalled();
   });
 

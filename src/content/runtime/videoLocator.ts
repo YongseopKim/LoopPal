@@ -3,11 +3,11 @@ type WaitForVideoElementArgs = {
   isActive: () => boolean;
   sleep: (ms: number) => Promise<void>;
   intervalMs?: number;
-  maxAttempts?: number;
+  maxAttempts?: number | null;
 };
 
 const DEFAULT_INTERVAL_MS = 50;
-const DEFAULT_MAX_ATTEMPTS = 40;
+const DEFAULT_MAX_ATTEMPTS = null;
 
 export async function waitForVideoElement({
   findVideo,
@@ -16,7 +16,9 @@ export async function waitForVideoElement({
   intervalMs = DEFAULT_INTERVAL_MS,
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
 }: WaitForVideoElementArgs): Promise<HTMLVideoElement | null> {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+  let attempt = 0;
+
+  while (isActive()) {
     if (!isActive()) {
       return null;
     }
@@ -27,9 +29,13 @@ export async function waitForVideoElement({
       return video;
     }
 
-    if (attempt < maxAttempts - 1) {
-      await sleep(intervalMs);
+    attempt += 1;
+
+    if (maxAttempts !== null && attempt >= maxAttempts) {
+      return null;
     }
+
+    await sleep(intervalMs);
   }
 
   return null;

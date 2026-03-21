@@ -12,6 +12,7 @@ type AppStore = {
 };
 
 type AppPlayer = {
+  setCurrentTime(value: number): void;
   setPlaybackRate(value: number): void;
   playSafely(): Promise<'started' | 'blocked'>;
 };
@@ -96,11 +97,29 @@ export function createAppController(deps: AppControllerDeps) {
         return null;
       }
 
+      if (activeSection) {
+        deps.player.setCurrentTime(activeSection.startTimeSec);
+      }
+
       deps.player.setPlaybackRate(speed);
 
-      const restoreStatus = canRestoreLoop
-        ? await deps.player.playSafely()
-        : ('idle' as const);
+      let restoreStatus: RestoreStatus = 'idle';
+
+      if (canRestoreLoop) {
+        try {
+          restoreStatus = await deps.player.playSafely();
+        } catch (error) {
+          if (
+            !isActive() &&
+            error instanceof DOMException &&
+            error.name === 'AbortError'
+          ) {
+            return null;
+          }
+
+          throw error;
+        }
+      }
 
       if (!isActive()) {
         return null;
