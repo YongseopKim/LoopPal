@@ -7,6 +7,10 @@ export type SessionAction =
   | { type: 'executeSelectedSection' }
   | { type: 'createSection'; payload: PracticeSection };
 
+function getOrderedSections(session: VideoPracticeSession): PracticeSection[] {
+  return [...session.sections].sort((left, right) => left.order - right.order);
+}
+
 function getSectionById(
   session: VideoPracticeSession,
   sectionId: string | null,
@@ -22,26 +26,32 @@ function getAdjacentSectionId(
   session: VideoPracticeSession,
   direction: -1 | 1,
 ): string | null {
-  if (session.sections.length === 0) {
+  const orderedSections = getOrderedSections(session);
+
+  if (orderedSections.length === 0) {
     return null;
   }
 
   if (!session.selectedSectionId) {
-    return session.sections[0]?.id ?? null;
+    return orderedSections[0]?.id ?? null;
   }
 
-  const currentIndex = session.sections.findIndex(
+  const currentIndex = orderedSections.findIndex(
     (section) => section.id === session.selectedSectionId,
   );
 
   if (currentIndex === -1) {
-    return session.sections[0]?.id ?? null;
+    return orderedSections[0]?.id ?? null;
   }
 
   const nextIndex =
-    (currentIndex + direction + session.sections.length) % session.sections.length;
+    (currentIndex + direction + orderedSections.length) % orderedSections.length;
 
-  return session.sections[nextIndex]?.id ?? null;
+  return orderedSections[nextIndex]?.id ?? null;
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled session action: ${JSON.stringify(value)}`);
 }
 
 export function reduceSession(
@@ -74,6 +84,6 @@ export function reduceSession(
         sections: [...session.sections, action.payload],
       };
     default:
-      return session;
+      return assertNever(action);
   }
 }

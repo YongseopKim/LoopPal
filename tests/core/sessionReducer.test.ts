@@ -48,11 +48,37 @@ describe('sessionReducer', () => {
     expect(next.activeSectionId).toBeNull();
   });
 
+  it('moves selection by stable section order when the array is unsorted', () => {
+    const unsortedSession: VideoPracticeSession = {
+      ...seedSession,
+      sections: [
+        makeSection('section-1', 0),
+        makeSection('section-3', 2),
+        makeSection('section-2', 1),
+      ],
+    };
+
+    const next = reduceSession(unsortedSession, { type: 'selectNextSection' });
+
+    expect(next.selectedSectionId).toBe('section-2');
+  });
+
   it('activates the selected section and resolves speed override', () => {
     const next = reduceSession(seedSession, { type: 'executeSelectedSection' });
 
     expect(next.activeSectionId).toBe('section-1');
+    expect(next.loopEnabled).toBe(true);
     expect(next.resolvedSpeed).toBe(0.65);
+  });
+
+  it('creates a section when the session has fewer than 10 sections', () => {
+    const next = reduceSession(seedSession, {
+      type: 'createSection',
+      payload: makeSection('section-3', 2),
+    });
+
+    expect(next.sections).toHaveLength(3);
+    expect(next.sections.at(-1)?.id).toBe('section-3');
   });
 
   it('rejects an 11th section', () => {
