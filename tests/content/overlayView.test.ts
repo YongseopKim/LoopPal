@@ -6,6 +6,7 @@ import {
 
 const viewModel: OverlayViewModel = {
   selectedSectionName: 'Chorus groove',
+  activeSectionName: 'Verse pocket',
   speedLabel: '0.75x',
   loopEnabled: true,
   panelExpanded: false,
@@ -26,6 +27,7 @@ describe('overlayView', () => {
     view.render(viewModel);
 
     expect(root.textContent).toContain('Chorus groove');
+    expect(root.textContent).toContain('Verse pocket');
     expect(root.textContent).toContain('0.75x');
     expect(root.querySelector('.bp-overlay__panel')).toBeNull();
   });

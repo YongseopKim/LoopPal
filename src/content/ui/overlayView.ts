@@ -6,6 +6,7 @@ export type OverlaySectionSummary = {
 
 export type OverlayViewModel = {
   selectedSectionName: string | null;
+  activeSectionName: string | null;
   speedLabel: string;
   loopEnabled: boolean;
   panelExpanded: boolean;
@@ -62,6 +63,7 @@ export function createOverlayView(root: HTMLElement) {
         <div class="bp-overlay">
           <div class="bp-overlay__bar">
             <strong class="bp-overlay__section-label">${escapeHtml(model.selectedSectionName ?? 'No section selected')}</strong>
+            <span class="bp-overlay__active">${escapeHtml(model.activeSectionName ?? 'No active loop')}</span>
             <span class="bp-overlay__speed">${escapeHtml(model.speedLabel)}</span>
             <span class="bp-overlay__loop">${model.loopEnabled ? 'Loop on' : 'Loop off'}</span>
             ${restoreLabel}

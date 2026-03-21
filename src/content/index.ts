@@ -14,6 +14,14 @@ import { createOverlayView } from './ui/overlayView';
 const LOOP_MONITOR_INTERVAL_MS = 50;
 const VIDEO_LOOKUP_INTERVAL_MS = 50;
 
+function reportRuntimeError(error: unknown) {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return;
+  }
+
+  console.error('bass-practice runtime error', error);
+}
+
 function sleep(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
@@ -108,7 +116,7 @@ function createBootstrapBinding(videoId: string | null) {
 
     const shortcutController = createShortcutController({
       onAction(action) {
-        void controller.handleShortcut(action);
+        void controller.handleShortcut(action).catch(reportRuntimeError);
       },
     });
     const handleKeydown = (event: KeyboardEvent) => {
@@ -131,7 +139,7 @@ function createBootstrapBinding(videoId: string | null) {
     }, LOOP_MONITOR_INTERVAL_MS);
   };
 
-  void bootstrap();
+  void bootstrap().catch(reportRuntimeError);
 
   return { videoId, stop };
 }

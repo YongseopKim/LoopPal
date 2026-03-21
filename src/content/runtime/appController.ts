@@ -64,16 +64,14 @@ function toViewModel(
   session: VideoPracticeSession,
   selectedSection: PracticeSection | null,
   activeSection: PracticeSection | null,
+  currentSpeed: number,
   restoreStatus: RestoreStatus,
   panelExpanded: boolean,
 ): OverlayViewModel {
-  const displaySection = selectedSection ?? activeSection;
-  const speed =
-    displaySection?.speedOverride ?? activeSection?.speedOverride ?? session.defaultSpeed;
-
   return {
-    selectedSectionName: displaySection?.name ?? null,
-    speedLabel: formatSpeedLabel(speed),
+    selectedSectionName: selectedSection?.name ?? null,
+    activeSectionName: activeSection?.name ?? null,
+    speedLabel: formatSpeedLabel(currentSpeed),
     loopEnabled: session.loopEnabled,
     panelExpanded,
     restoreStatus,
@@ -93,6 +91,7 @@ export function createAppController(deps: AppControllerDeps) {
   let session: VideoPracticeSession | null = null;
   let panelExpanded = false;
   let restoreStatus: RestoreStatus = 'idle';
+  let currentSpeed = 1;
   let pendingShortcut: Promise<void> = Promise.resolve();
 
   const render = () => {
@@ -105,6 +104,7 @@ export function createAppController(deps: AppControllerDeps) {
         session,
         getSelectedSection(session),
         getActiveSection(session),
+        currentSpeed,
         restoreStatus,
         panelExpanded,
       ),
@@ -120,6 +120,7 @@ export function createAppController(deps: AppControllerDeps) {
     }
 
     const speed = nextSection?.speedOverride ?? session.defaultSpeed;
+    currentSpeed = speed;
 
     if (nextSection) {
       deps.player.setCurrentTime(nextSection.startTimeSec);

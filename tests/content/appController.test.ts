@@ -123,6 +123,37 @@ describe('appController', () => {
       expect.objectContaining({
         restoreStatus: 'idle',
         selectedSectionName: null,
+        activeSectionName: null,
+      }),
+    );
+  });
+
+  it('keeps the playback speed label at the current speed when only a section is selected on restore', async () => {
+    const store = {
+      load: vi.fn().mockResolvedValue({
+        ...seedSession,
+        loopEnabled: false,
+        activeSectionId: null,
+        selectedSectionId: 'section-1',
+      }),
+      save: vi.fn(),
+    };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+
+    expect(overlay.render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Verse',
+        activeSectionName: null,
+        speedLabel: '0.8x',
       }),
     );
   });
@@ -236,6 +267,8 @@ describe('appController', () => {
     expect(overlay.render).toHaveBeenLastCalledWith(
       expect.objectContaining({
         selectedSectionName: 'Chorus',
+        activeSectionName: 'Verse',
+        speedLabel: '0.65x',
         panelExpanded: false,
       }),
     );
