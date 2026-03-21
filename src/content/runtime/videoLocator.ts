@@ -14,40 +14,62 @@ export type BoundVideoState = {
   currentSrc: string;
 };
 
-export function findWatchPlayerVideo(
-  root: ParentNode,
-  previousVideoState?: BoundVideoState,
-): HTMLVideoElement | null {
+function getWatchPlayerVideoCandidates(root: ParentNode): HTMLVideoElement[] {
   const selectors = [
     '#movie_player video.html5-main-video',
     '#movie_player video',
     'video.html5-main-video',
   ];
   const visitedCandidates = new Set<HTMLVideoElement>();
+  const candidates: HTMLVideoElement[] = [];
 
   for (const selector of selectors) {
-    const candidates = root.querySelectorAll(selector);
-
-    for (const candidate of candidates) {
+    for (const candidate of root.querySelectorAll(selector)) {
       if (!(candidate instanceof HTMLVideoElement) || visitedCandidates.has(candidate)) {
         continue;
       }
 
       visitedCandidates.add(candidate);
-
-      if (
-        previousVideoState &&
-        previousVideoState.element === candidate &&
-        candidate.currentSrc === previousVideoState.currentSrc
-      ) {
-        continue;
-      }
-
-      return candidate;
+      candidates.push(candidate);
     }
   }
 
+  return candidates;
+}
+
+export function findWatchPlayerVideo(
+  root: ParentNode,
+  previousVideoState?: BoundVideoState,
+): HTMLVideoElement | null {
+  for (const candidate of getWatchPlayerVideoCandidates(root)) {
+    if (
+      previousVideoState &&
+      previousVideoState.element === candidate &&
+      candidate.currentSrc === previousVideoState.currentSrc
+    ) {
+      continue;
+    }
+
+    return candidate;
+  }
+
   return null;
+}
+
+export function captureWatchPlayerVideoState(
+  root: ParentNode,
+  previousVideoState: BoundVideoState,
+): BoundVideoState {
+  const candidate = getWatchPlayerVideoCandidates(root)[0] ?? null;
+
+  if (!(candidate instanceof HTMLVideoElement)) {
+    return previousVideoState;
+  }
+
+  return {
+    element: candidate,
+    currentSrc: candidate.currentSrc,
+  };
 }
 
 export async function waitForVideoElement({

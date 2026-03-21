@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  captureWatchPlayerVideoState,
   findWatchPlayerVideo,
   waitForVideoElement,
 } from '../../src/content/runtime/videoLocator';
@@ -81,6 +82,30 @@ describe('videoLocator', () => {
         currentSrc: 'https://cdn.test/old.mp4',
       }),
     ).toBe(replacementVideo);
+  });
+
+  it('captures the current watch-player state even before any video was previously bound', () => {
+    const moviePlayer = document.createElement('div');
+    const mainPlayerVideo = document.createElement('video');
+
+    moviePlayer.id = 'movie_player';
+    mainPlayerVideo.className = 'html5-main-video';
+    Object.defineProperty(mainPlayerVideo, 'currentSrc', {
+      configurable: true,
+      value: 'https://cdn.test/outgoing.mp4',
+    });
+    moviePlayer.append(mainPlayerVideo);
+    document.body.append(moviePlayer);
+
+    expect(
+      captureWatchPlayerVideoState(document, {
+        element: null,
+        currentSrc: '',
+      }),
+    ).toEqual({
+      element: mainPlayerVideo,
+      currentSrc: 'https://cdn.test/outgoing.mp4',
+    });
   });
 
   it('retries until a video element appears', async () => {

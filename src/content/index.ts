@@ -3,6 +3,7 @@ import { createAppController } from './runtime/appController';
 import { createLoopMonitor } from './runtime/loopMonitor';
 import { createShortcutController } from './runtime/shortcutController';
 import {
+  captureWatchPlayerVideoState,
   type BoundVideoState,
   findWatchPlayerVideo,
   waitForVideoElement,
@@ -192,6 +193,7 @@ const unsubscribeFromNavigations = subscribeToPageNavigations(window, (url) => {
     return;
   }
 
+  lastBoundVideoState = captureWatchPlayerVideoState(document, lastBoundVideoState);
   binding.stop();
   binding = createBootstrapBinding(nextVideoId, lastBoundVideoState);
 });
