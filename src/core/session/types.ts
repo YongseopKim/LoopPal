@@ -7,6 +7,8 @@ export type PracticeSection = {
   speedOverride: number | null;
   order: number;
   updatedAt: number;
+  executionCount?: number;
+  executionHistory?: number[];
 };
 
 export type VideoPracticeSession = {

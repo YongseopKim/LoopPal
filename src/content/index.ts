@@ -166,8 +166,11 @@ function createBootstrapBinding(
       onDeleteSection(sectionId) {
         void controller?.deleteSection(sectionId).catch(reportRuntimeError);
       },
-      onToggleLoop() {
-        void controller?.toggleLoop().catch(reportRuntimeError);
+      onToggleLoop(sectionId?: string) {
+        void controller?.toggleLoop(sectionId).catch(reportRuntimeError);
+      },
+      onOpenKeyGuide() {
+        void controller?.handleShortcut('togglePanel').catch(reportRuntimeError);
       },
       onOpenShortcutSettings() {
         shortcutModalState = {

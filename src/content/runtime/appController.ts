@@ -13,6 +13,13 @@ import type { ShortcutAction } from './defaultKeymap';
 
 type RestoreStatus = 'idle' | 'started' | 'blocked';
 
+const SMALL_NUDGE_STEP_SEC = 0.1;
+const BIG_NUDGE_STEP_SEC = 5;
+const ONE_HOUR_MS = 3_600_000;
+const ONE_DAY_MS = 24 * ONE_HOUR_MS;
+const ONE_WEEK_MS = 7 * ONE_DAY_MS;
+const ONE_MONTH_MS = 30 * ONE_DAY_MS;
+
 type AppStore = {
   load(videoId: string): Promise<VideoPracticeSession | null>;
   save(session: VideoPracticeSession): Promise<void>;
@@ -193,6 +200,65 @@ function formatTimeLabel(timeSec: number): string {
   return `${normalizeTime(timeSec).toFixed(1)}s`;
 }
 
+function formatSectionRangeLabel(section: PracticeSection): string {
+  return `${formatTimeLabel(section.startTimeSec)} ~ ${formatTimeLabel(section.endTimeSec)}`;
+}
+
+type SectionExecutionCounts = {
+  lastHour: number;
+  lastDay: number;
+  lastWeek: number;
+  lastMonth: number;
+  total: number;
+};
+
+function getSectionExecutionCounts(
+  section: PracticeSection,
+  now: number,
+): SectionExecutionCounts {
+  const history = section.executionHistory ?? [];
+  const total = section.executionCount ?? history.length;
+
+  return {
+    lastHour: history.filter((ts) => ts >= now - ONE_HOUR_MS).length,
+    lastDay: history.filter((ts) => ts >= now - ONE_DAY_MS).length,
+    lastWeek: history.filter((ts) => ts >= now - ONE_WEEK_MS).length,
+    lastMonth: history.filter((ts) => ts >= now - ONE_MONTH_MS).length,
+    total,
+  };
+}
+
+function withRecordedExecution(
+  session: VideoPracticeSession,
+  sectionId: string,
+  now: number,
+): VideoPracticeSession {
+  const cutoff = now - ONE_MONTH_MS;
+
+  return updateSection(session, sectionId, (section) => {
+    const nextHistory = [...(section.executionHistory ?? []), now].filter((time) => time >= cutoff);
+
+    return {
+      ...section,
+      executionCount: (section.executionCount ?? 0) + 1,
+      executionHistory: nextHistory,
+      updatedAt: now,
+    };
+  });
+}
+
+function clearLoopState(
+  session: VideoPracticeSession,
+  options: { clearSelection: boolean },
+): VideoPracticeSession {
+  return {
+    ...session,
+    loopEnabled: false,
+    activeSectionId: null,
+    selectedSectionId: options.clearSelection ? null : session.selectedSectionId,
+  };
+}
+
 function getNextSectionOrder(session: VideoPracticeSession): number {
   return session.sections.reduce((highestOrder, section) => {
     return Math.max(highestOrder, section.order);
@@ -238,6 +304,7 @@ function toViewModel(
   restoreStatus: RestoreStatus,
   panelExpanded: boolean,
   statusMessage: string | null,
+  now: number,
 ): OverlayViewModel {
   const selectedSection = session ? getSelectedSection(session) : null;
   const activeSection = session ? getActiveSection(session) : null;
@@ -259,6 +326,8 @@ function toViewModel(
         id: section.id,
         name: section.name,
         memo: section.memo,
+        rangeLabel: formatSectionRangeLabel(section),
+        executionCounts: getSectionExecutionCounts(section, now),
       })),
   };
 }
@@ -326,6 +395,7 @@ export function createAppController(deps: AppControllerDeps) {
         restoreStatus,
         panelExpanded,
         statusMessage,
+        getNow(),
       ),
     );
   };
@@ -451,6 +521,7 @@ export function createAppController(deps: AppControllerDeps) {
   const handleSectionNudge = async (
     field: 'start' | 'end',
     direction: -1 | 1,
+    stepSeconds: number = SMALL_NUDGE_STEP_SEC,
   ) => {
     if (!session) {
       renderSelectionRequired();
@@ -471,13 +542,13 @@ export function createAppController(deps: AppControllerDeps) {
     const nextRange =
       field === 'start'
         ? clampSectionRange(
-          selectedSection.startTimeSec + direction * 0.1,
+          selectedSection.startTimeSec + direction * stepSeconds,
           selectedSection.endTimeSec,
           duration,
         )
         : clampSectionRange(
           selectedSection.startTimeSec,
-          selectedSection.endTimeSec + direction * 0.1,
+          selectedSection.endTimeSec + direction * stepSeconds,
           duration,
         );
 
@@ -556,7 +627,14 @@ export function createAppController(deps: AppControllerDeps) {
     }
 
     statusMessage = null;
+    const now = getNow();
+
     session = reduceSession(session, { type: 'executeSelectedSection' });
+    session = withRecordedExecution(
+      session,
+      getActiveSection(session)?.id ?? '',
+      now,
+    );
     restoreStatus = await applySectionPlayback(getActiveSection(session), true);
 
     if (!isActive()) {
@@ -705,6 +783,26 @@ export function createAppController(deps: AppControllerDeps) {
           return;
         }
 
+        if (action === 'nudgeSectionStartBackwardLarge') {
+          await handleSectionNudge('start', -1, BIG_NUDGE_STEP_SEC);
+          return;
+        }
+
+        if (action === 'nudgeSectionStartForwardLarge') {
+          await handleSectionNudge('start', 1, BIG_NUDGE_STEP_SEC);
+          return;
+        }
+
+        if (action === 'nudgeSectionEndBackwardLarge') {
+          await handleSectionNudge('end', -1, BIG_NUDGE_STEP_SEC);
+          return;
+        }
+
+        if (action === 'nudgeSectionEndForwardLarge') {
+          await handleSectionNudge('end', 1, BIG_NUDGE_STEP_SEC);
+          return;
+        }
+
         if (action === 'decreaseSpeed') {
           await handleSpeedStep(-1);
           return;
@@ -758,6 +856,25 @@ export function createAppController(deps: AppControllerDeps) {
           return;
         }
 
+        const now = getNow();
+        const isActiveSectionRunning = session.loopEnabled
+          && session.activeSectionId === nextSection.id;
+
+        if (isActiveSectionRunning) {
+          session = clearLoopState(session, { clearSelection: true });
+          restoreStatus = 'idle';
+          statusMessage = `Stopped ${nextSection.name}`;
+
+          await deps.store.save(session);
+
+          if (!isActive()) {
+            return;
+          }
+
+          render();
+          return;
+        }
+
         statusMessage = null;
         session = reduceSession(
           {
@@ -765,6 +882,11 @@ export function createAppController(deps: AppControllerDeps) {
             selectedSectionId: nextSection.id,
           },
           { type: 'executeSelectedSection' },
+        );
+        session = withRecordedExecution(
+          session,
+          nextSection.id,
+          now,
         );
         restoreStatus = await applySectionPlayback(getActiveSection(session), true);
 
@@ -813,7 +935,7 @@ export function createAppController(deps: AppControllerDeps) {
         await deleteSectionById(sectionId, { skipConfirm: true });
       });
     },
-    async toggleLoop(): Promise<void> {
+    async toggleLoop(sectionId?: string): Promise<void> {
       await enqueue(async () => {
         if (!isActive()) {
           return;
@@ -824,12 +946,60 @@ export function createAppController(deps: AppControllerDeps) {
           return;
         }
 
-        if (session.loopEnabled) {
+        if (sectionId) {
+          const targetSection = getSectionById(session, sectionId);
+
+          if (!targetSection) {
+            return;
+          }
+
+          const isTargetActive = session.loopEnabled
+            && session.activeSectionId === sectionId;
+
+          if (isTargetActive) {
+            session = clearLoopState(session, { clearSelection: true });
+            restoreStatus = 'idle';
+            statusMessage = `Stopped ${targetSection.name}`;
+
+            await deps.store.save(session);
+
+            if (!isActive()) {
+              return;
+            }
+
+            render();
+            return;
+          }
+
+          statusMessage = null;
           session = {
             ...session,
-            loopEnabled: false,
-            activeSectionId: null,
+            selectedSectionId: sectionId,
           };
+          session = reduceSession(session, { type: 'executeSelectedSection' });
+          session = withRecordedExecution(
+            session,
+            sectionId,
+            getNow(),
+          );
+          restoreStatus = await applySectionPlayback(getActiveSection(session), true);
+
+          if (!isActive()) {
+            return;
+          }
+
+          await deps.store.save(session);
+
+          if (!isActive()) {
+            return;
+          }
+
+          render();
+          return;
+        }
+
+        if (session.loopEnabled) {
+          session = clearLoopState(session, { clearSelection: false });
           restoreStatus = 'idle';
           statusMessage = 'Loop stopped';
 

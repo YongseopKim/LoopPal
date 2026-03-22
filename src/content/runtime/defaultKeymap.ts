@@ -10,6 +10,10 @@ export const SHORTCUT_ACTIONS = [
   'nudgeSectionStartForward',
   'nudgeSectionEndBackward',
   'nudgeSectionEndForward',
+  'nudgeSectionStartBackwardLarge',
+  'nudgeSectionStartForwardLarge',
+  'nudgeSectionEndBackwardLarge',
+  'nudgeSectionEndForwardLarge',
   'decreaseSpeed',
   'increaseSpeed',
   'selectSectionSlot1',
@@ -58,6 +62,10 @@ export const SHORTCUT_ACTION_GROUPS = [
       'nudgeSectionStartForward',
       'nudgeSectionEndBackward',
       'nudgeSectionEndForward',
+      'nudgeSectionStartBackwardLarge',
+      'nudgeSectionStartForwardLarge',
+      'nudgeSectionEndBackwardLarge',
+      'nudgeSectionEndForwardLarge',
     ],
   },
   {
@@ -134,6 +142,22 @@ export const SHORTCUT_ACTION_META: Record<
   nudgeSectionEndForward: {
     label: 'Section end +0.1s',
     description: 'Move the selected section end later by 0.1 seconds',
+  },
+  nudgeSectionStartBackwardLarge: {
+    label: 'Section start -5s',
+    description: 'Move the selected section start earlier by 5 seconds',
+  },
+  nudgeSectionStartForwardLarge: {
+    label: 'Section start +5s',
+    description: 'Move the selected section start later by 5 seconds',
+  },
+  nudgeSectionEndBackwardLarge: {
+    label: 'Section end -5s',
+    description: 'Move the selected section end earlier by 5 seconds',
+  },
+  nudgeSectionEndForwardLarge: {
+    label: 'Section end +5s',
+    description: 'Move the selected section end later by 5 seconds',
   },
   decreaseSpeed: {
     label: 'Speed -',
@@ -226,7 +250,7 @@ export const DEFAULT_KEYMAP: ShortcutKeymap = {
     metaKey: false,
   },
   togglePanel: {
-    code: 'Slash',
+    code: 'F1',
     shiftKey: false,
     altKey: false,
     ctrlKey: false,
@@ -270,6 +294,34 @@ export const DEFAULT_KEYMAP: ShortcutKeymap = {
   nudgeSectionEndForward: {
     code: 'Period',
     shiftKey: false,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  },
+  nudgeSectionStartBackwardLarge: {
+    code: 'Minus',
+    shiftKey: true,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  },
+  nudgeSectionStartForwardLarge: {
+    code: 'Equal',
+    shiftKey: true,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  },
+  nudgeSectionEndBackwardLarge: {
+    code: 'Comma',
+    shiftKey: true,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  },
+  nudgeSectionEndForwardLarge: {
+    code: 'Period',
+    shiftKey: true,
     altKey: false,
     ctrlKey: false,
     metaKey: false,

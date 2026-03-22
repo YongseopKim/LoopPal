@@ -10,6 +10,14 @@ export type OverlaySectionSummary = {
   id: string;
   name: string;
   memo: string;
+  rangeLabel?: string;
+  executionCounts?: {
+    lastHour: number;
+    lastDay: number;
+    lastWeek: number;
+    lastMonth: number;
+    total: number;
+  };
 };
 
 export type OverlayViewModel = {
@@ -41,8 +49,9 @@ type OverlayViewHandlers = {
   onShortcutAction?: (action: ShortcutAction) => void;
   onExecuteSection?: (sectionId: string) => void;
   onDeleteSection?: (sectionId: string) => void;
-  onToggleLoop?: () => void;
+  onToggleLoop?: (sectionId?: string) => void;
   onOpenShortcutSettings?: () => void;
+  onOpenKeyGuide?: () => void;
   onCloseShortcutSettings?: () => void;
   onBeginShortcutCapture?: (action: ShortcutAction) => void;
   onResetShortcut?: (action: ShortcutAction) => void;
@@ -143,7 +152,7 @@ function renderSections(model: OverlayViewModel): string {
           ? '<span class="bp-overlay__badge bp-overlay__badge--selected">Selected</span>'
           : '',
         isActive
-          ? '<span class="bp-overlay__badge bp-overlay__badge--active">Looping</span>'
+          ? `<button type="button" class="bp-overlay__section-loop-chip" data-overlay-action="toggleLoopForSection" data-section-id="${escapeHtml(section.id)}" title="Stop looping this section">Looping</button>`
           : '',
       ]
         .filter(Boolean)
@@ -152,6 +161,18 @@ function renderSections(model: OverlayViewModel): string {
         isSelected && section.memo
           ? `<p class="bp-overlay__section-memo">${escapeHtml(section.memo)}</p>`
           : '';
+      const rangeLabel =
+        section.rangeLabel
+          ? `<p class="bp-overlay__section-range">${escapeHtml(section.rangeLabel)}</p>`
+          : '';
+      const executionCounts = section.executionCounts ?? {
+        lastHour: 0,
+        lastDay: 0,
+        lastWeek: 0,
+        lastMonth: 0,
+        total: 0,
+      };
+      const executionLabel = `<p class="bp-overlay__section-stats">1h:${executionCounts.lastHour} / 1d:${executionCounts.lastDay} / 1w:${executionCounts.lastWeek} / 1m:${executionCounts.lastMonth} / total:${executionCounts.total}</p>`;
 
       return `
         <li>
@@ -167,7 +188,9 @@ function renderSections(model: OverlayViewModel): string {
                 <strong class="bp-overlay__section-name">${escapeHtml(section.name)}</strong>
                 <span class="bp-overlay__section-badges">${badges}</span>
               </span>
+              ${rangeLabel}
               ${memo}
+              ${executionLabel}
             </button>
             <button
               type="button"
@@ -192,7 +215,7 @@ function renderSections(model: OverlayViewModel): string {
       </div>
       <ul class="bp-overlay__sections">${sectionItems}</ul>
       <p class="bp-overlay__selection-note">
-        Click a section to run it immediately.${selectedSection?.memo ? ' The selected memo appears inline.' : ''}
+        Click a section to run it immediately; click an active section again to stop.${selectedSection?.memo ? ' The selected memo appears inline.' : ''}
       </p>
     </div>
   `;
@@ -253,6 +276,14 @@ function renderToolbar(screen: OverlayScreenModel): string {
           title="Open shortcut settings"
         >
           Shortcuts
+        </button>
+        <button
+          type="button"
+          class="bp-overlay__control-button"
+          data-overlay-action="openKeyGuide"
+          title="Show or hide the full key guide"
+        >
+          Full key guide
         </button>
       </div>
     </div>
@@ -382,8 +413,23 @@ export function createOverlayView(
         return;
       }
 
+      if (overlayAction === 'toggleLoopForSection') {
+        const sectionId = target.dataset.sectionId;
+
+        if (sectionId) {
+          currentHandlers?.onToggleLoop?.(sectionId);
+        }
+
+        return;
+      }
+
       if (overlayAction === 'openShortcutSettings') {
         currentHandlers?.onOpenShortcutSettings?.();
+        return;
+      }
+
+      if (overlayAction === 'openKeyGuide') {
+        currentHandlers?.onOpenKeyGuide?.();
         return;
       }
 
@@ -450,7 +496,7 @@ export function createOverlayView(
         (model.restoreStatus === 'blocked' ? 'Tap play to resume loop' : '');
       const statusLabel = statusText
         ? `<span class="bp-overlay__restore">${escapeHtml(statusText)}</span>`
-        : '<span class="bp-overlay__restore bp-overlay__restore--muted">Hover buttons to see the shortcuts. Press / to open the full key guide.</span>';
+        : '<span class="bp-overlay__restore bp-overlay__restore--muted">Hover buttons to see the shortcuts. Click "Full key guide".</span>';
 
       root.innerHTML = `
         <div class="bp-overlay">
