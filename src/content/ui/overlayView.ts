@@ -34,6 +34,7 @@ export type OverlayViewModel = {
   restoreStatus?: 'idle' | 'started' | 'blocked';
   statusMessage?: string | null;
   videoDurationSec?: number;
+  currentVideoTimeSec?: number;
   sections: OverlaySectionSummary[];
 };
 
@@ -53,6 +54,11 @@ type OverlayViewHandlers = {
   onShortcutAction?: (action: ShortcutAction) => void;
   onExecuteSection?: (sectionId: string) => void;
   onDeleteSection?: (sectionId: string) => void;
+  onNudgeSection?: (
+    sectionId: string,
+    field: 'start' | 'end',
+    direction: -1 | 1,
+  ) => void;
   onToggleLoop?: (sectionId?: string) => void;
   onOpenShortcutSettings?: () => void;
   onOpenKeyGuide?: () => void;
@@ -60,6 +66,7 @@ type OverlayViewHandlers = {
   onBeginShortcutCapture?: (action: ShortcutAction) => void;
   onResetShortcut?: (action: ShortcutAction) => void;
   onResetAllShortcuts?: () => void;
+  onClearSelection?: () => void;
 };
 
 const OVERLAY_VIEW_HANDLERS = new WeakMap<HTMLElement, OverlayViewHandlers>();
@@ -71,12 +78,8 @@ type ToolbarButtonSpec = {
 };
 
 const TOOLBAR_BUTTONS: readonly ToolbarButtonSpec[] = [
-  { action: 'decreaseSpeed', label: 'Speed -' },
-  { action: 'increaseSpeed', label: 'Speed +' },
-  { action: 'nudgeSectionStartBackward', label: 'Start -0.1' },
-  { action: 'nudgeSectionStartForward', label: 'Start +0.1' },
-  { action: 'nudgeSectionEndBackward', label: 'End -0.1' },
-  { action: 'nudgeSectionEndForward', label: 'End +0.1' },
+  { action: 'decreaseSpeed', label: '↓' },
+  { action: 'increaseSpeed', label: '↑' },
 ] as const;
 
 type ControlButtonRenderOptions = {
@@ -132,13 +135,36 @@ function formatTimelineRangeStyle(
 
   const safeStart = Math.max(0, startSec);
   const safeEnd = Math.max(safeStart, endSec);
-  const left = `${Math.max(0, Math.min(100, (safeStart / durationSec) * 100)).toFixed(2)}%`;
-  const width = `${Math.max(
-    0.4,
-    Math.min(100 - parseFloat(left), ((safeEnd - safeStart) / durationSec) * 100),
-  ).toFixed(2)}%`;
+  const left = Math.max(0, Math.min(100, (safeStart / durationSec) * 100));
+  const right = Math.max(
+    left,
+    Math.max(0, Math.min(100, (safeEnd / durationSec) * 100)),
+  );
+  const width = Math.max(0.6, right - left);
 
-  return `left:${left};width:${width}`;
+  return `left:${left.toFixed(2)}%;width:${width.toFixed(2)}%`;
+}
+
+function formatTimelinePointerStyle(
+  timeSec: number | undefined,
+  durationSec: number,
+): string {
+  if (
+    timeSec === undefined ||
+    !Number.isFinite(timeSec) ||
+    !Number.isFinite(durationSec) ||
+    durationSec <= 0
+  ) {
+    return '';
+  }
+
+  const left = Math.max(0, Math.min(100, (timeSec / durationSec) * 100));
+
+  return `left:${left.toFixed(2)}%`;
+}
+
+function formatSectionTimeLabel(timeSec: number): string {
+  return `${timeSec.toFixed(1)}s`;
 }
 
 function renderLegend(keymap: ShortcutKeymap): string {
@@ -190,6 +216,14 @@ function renderSections(model: OverlayViewModel): string {
     .map((section) => {
       const isSelected = section.id === model.selectedSectionId;
       const isActive = section.id === model.activeSectionId;
+      const startLabel =
+        section.startTimeSec === undefined
+          ? '—'
+          : formatSectionTimeLabel(section.startTimeSec);
+      const endLabel =
+        section.endTimeSec === undefined
+          ? '—'
+          : formatSectionTimeLabel(section.endTimeSec);
       const badges = [
         isSelected
           ? '<span class="bp-overlay__badge bp-overlay__badge--selected">Selected</span>'
@@ -200,19 +234,18 @@ function renderSections(model: OverlayViewModel): string {
       ]
         .filter(Boolean)
         .join('');
-      const memo =
-        isSelected && section.memo
-          ? `<p class="bp-overlay__section-memo">${escapeHtml(section.memo)}</p>`
-          : '';
-      const rangeLabel =
-        section.rangeLabel
-          ? `<p class="bp-overlay__section-range">${escapeHtml(section.rangeLabel)}</p>`
-          : (section.startTimeSec === undefined || section.endTimeSec === undefined
-            ? ''
-            : `<p class="bp-overlay__section-range">${escapeHtml(formatRangeLabel(section.startTimeSec, section.endTimeSec))}</p>`);
+      const inlineMemo = section.memo
+        ? `<span class="bp-overlay__section-inline-memo">${escapeHtml(section.memo)}</span>`
+        : '';
       const timelineStyle = section.startTimeSec === undefined || section.endTimeSec === undefined
         ? ''
         : `style="${formatTimelineRangeStyle(section.startTimeSec, section.endTimeSec, totalDurationSec)}"`;
+      const timelinePointerStyle = isSelected
+        ? formatTimelinePointerStyle(model.currentVideoTimeSec, totalDurationSec)
+        : '';
+      const timelinePointer = timelinePointerStyle
+        ? `<span class="bp-overlay__section-timeline-playhead" style="${timelinePointerStyle}" aria-hidden="true"></span>`
+        : '';
       const executionCounts = section.executionCounts ?? {
         lastHour: 0,
         lastDay: 0,
@@ -220,38 +253,99 @@ function renderSections(model: OverlayViewModel): string {
         lastMonth: 0,
         total: 0,
       };
-      const executionLabel = `<p class="bp-overlay__section-stats">1h:${executionCounts.lastHour} / 1d:${executionCounts.lastDay} / 1w:${executionCounts.lastWeek} / 1m:${executionCounts.lastMonth} / total:${executionCounts.total}</p>`;
+      const executionLabel = `<span class="bp-overlay__section-stats">1h:${executionCounts.lastHour} / 1d:${executionCounts.lastDay} / 1w:${executionCounts.lastWeek} / 1m:${executionCounts.lastMonth} / total:${executionCounts.total}</span>`;
+      const sectionStartControls = isSelected
+        ? `
+          <button
+            type="button"
+            class="bp-overlay__section-adjust-button"
+            data-section-action="nudgeSectionStartBackward"
+            data-section-id="${escapeHtml(section.id)}"
+            title="Move section start backward by 0.1s"
+          >
+            S-
+          </button>
+          <button
+            type="button"
+            class="bp-overlay__section-adjust-button"
+            data-section-action="nudgeSectionStartForward"
+            data-section-id="${escapeHtml(section.id)}"
+            title="Move section start forward by 0.1s"
+          >
+            S+
+          </button>
+        `
+        : '';
+      const sectionEndControls = isSelected
+        ? `
+          <button
+            type="button"
+            class="bp-overlay__section-adjust-button"
+            data-section-action="nudgeSectionEndBackward"
+            data-section-id="${escapeHtml(section.id)}"
+            title="Move section end backward by 0.1s"
+          >
+            E-
+          </button>
+          <button
+            type="button"
+            class="bp-overlay__section-adjust-button"
+            data-section-action="nudgeSectionEndForward"
+            data-section-id="${escapeHtml(section.id)}"
+            title="Move section end forward by 0.1s"
+          >
+            E+
+          </button>
+        `
+        : '';
+      const sectionRangeControls = isSelected
+        ? `${sectionStartControls}
+            <span class="bp-overlay__section-range">${escapeHtml(startLabel)}</span>
+            <span class="bp-overlay__section-timestamp-sep">~</span>
+            <span class="bp-overlay__section-range">${escapeHtml(endLabel)}</span>
+            ${sectionEndControls}`
+        : `
+            <span class="bp-overlay__section-range">${escapeHtml(startLabel)}</span>
+            <span class="bp-overlay__section-timestamp-sep">~</span>
+            <span class="bp-overlay__section-range">${escapeHtml(endLabel)}</span>`;
 
       return `
         <li>
           <div class="bp-overlay__section-row">
-            <button
-              type="button"
+            <div
               class="bp-overlay__section${isSelected ? ' bp-overlay__section--selected' : ''}${isActive ? ' bp-overlay__section--active' : ''}"
               data-overlay-action="executeSection"
               data-section-id="${escapeHtml(section.id)}"
+              role="button"
+              tabindex="0"
               title="Click to run this section immediately"
             >
               <span class="bp-overlay__section-topline">
-                <strong class="bp-overlay__section-name">${escapeHtml(section.name)}</strong>
-                <span class="bp-overlay__section-badges">${badges}</span>
+                <span class="bp-overlay__section-title-group">
+                  <strong class="bp-overlay__section-name">${escapeHtml(section.name)}</strong>
+                  ${inlineMemo}
+                  <span class="bp-overlay__section-badges">${badges}</span>
+                </span>
+                <span class="bp-overlay__section-meta">
+                  ${executionLabel}
+                  <button
+                    type="button"
+                    class="bp-overlay__section-delete"
+                    data-overlay-action="deleteSection"
+                    data-section-id="${escapeHtml(section.id)}"
+                    title="Delete this section"
+                  >
+                    Delete
+                  </button>
+                </span>
               </span>
               <div class="bp-overlay__section-timeline">
                 <span class="bp-overlay__section-timeline-range" ${timelineStyle}></span>
+                ${timelinePointer}
               </div>
-              ${rangeLabel}
-              ${memo}
-              ${executionLabel}
-            </button>
-            <button
-              type="button"
-              class="bp-overlay__section-delete"
-              data-overlay-action="deleteSection"
-              data-section-id="${escapeHtml(section.id)}"
-              title="Delete this section"
-            >
-              Delete
-            </button>
+              <div class="bp-overlay__section-range-row">
+                ${sectionRangeControls}
+              </div>
           </div>
         </li>
       `;
@@ -266,7 +360,7 @@ function renderSections(model: OverlayViewModel): string {
       </div>
       <ul class="bp-overlay__sections">${sectionItems}</ul>
       <p class="bp-overlay__selection-note">
-        Click a section to run it immediately; click an active section again to stop.${selectedSection?.memo ? ' The selected memo appears inline.' : ''}
+        Click a section to run it immediately; click an active section again to stop.${selectedSection ? ' Start/End controls are shown when selected.' : ''}
       </p>
     </div>
   `;
@@ -288,48 +382,37 @@ function renderSavedPanel(screen: OverlayScreenModel): string {
 
 function renderMainControls(screen: OverlayScreenModel): string {
   const model = screen.practice;
-  const activeSummary = model.activeSectionName
-    ? `Looping ${model.activeSectionName}`
-    : 'No active loop';
   const selectedSection = model.sections.find(
     (section) => section.id === model.selectedSectionId,
   );
+  const selectedSectionLabel = 'NEW';
   const loopTitle = model.loopEnabled
     ? `Loop off: stop repeating ${selectedSection?.name ?? 'the selected section'}`
     : `Loop on: run ${selectedSection?.name ?? 'the selected section'} (${formatShortcutForAction(screen.shortcutKeymap, 'executeSelectedSection')})`;
   const loopLabel = model.loopEnabled ? 'Loop On' : 'Loop Off';
-
   return `
-    <div class="bp-overlay__main">
+      <div class="bp-overlay__main">
       <div class="bp-overlay__main-card">
-        <div class="bp-overlay__control-stack">
+      <div class="bp-overlay__control-stack">
           <div class="bp-overlay__control-group">
             <button
               type="button"
-              class="bp-overlay__control-button${selectedSection ? ' bp-overlay__control-button--pressed' : ''}"
+              class="bp-overlay__control-button${selectedSection || model.markStartPending ? ' bp-overlay__control-button--pressed' : ''}"
+              data-overlay-action="clearSelection"
               title="Current selected section"
             >
-              ${escapeHtml(selectedSection ? `Section ${model.sections.findIndex((section) => section.id === selectedSection.id) + 1}` : 'No section selected')}
+              ${escapeHtml(selectedSectionLabel)}
             </button>
-            <span class="bp-overlay__active-chip">${escapeHtml(activeSummary)}</span>
+            ${renderControlButton(screen.shortcutKeymap, { action: 'markSectionStart', label: 'Start' }, {
+              isPressed: model.markStartPending ?? false,
+              className: 'bp-overlay__control-button--mark',
+            })}
+            ${renderControlButton(screen.shortcutKeymap, { action: 'markSectionEnd', label: 'End' })}
           </div>
           <div class="bp-overlay__control-group">
             ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[0])}
             <span class="bp-overlay__speed-chip" title="Current playback speed">${escapeHtml(model.speedLabel)}</span>
             ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[1])}
-          </div>
-          <div class="bp-overlay__control-group">
-            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[2])}
-            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[3])}
-            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[4])}
-            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[5])}
-          </div>
-          <div class="bp-overlay__control-group">
-            ${renderControlButton(screen.shortcutKeymap, { action: 'markSectionStart', label: 'Mark Start' }, {
-              isPressed: model.markStartPending ?? false,
-              className: 'bp-overlay__control-button--mark',
-            })}
-            ${renderControlButton(screen.shortcutKeymap, { action: 'markSectionEnd', label: 'Mark End' })}
           </div>
           <div class="bp-overlay__control-group">
             <button
@@ -340,13 +423,15 @@ function renderMainControls(screen: OverlayScreenModel): string {
             >
               ${escapeHtml(loopLabel)}
             </button>
+          </div>
+          <div class="bp-overlay__control-group">
             <button
               type="button"
               class="bp-overlay__control-button"
               data-overlay-action="openShortcutSettings"
               title="Open shortcuts"
             >
-              Shortcuts
+              Shortcuts / Key guide
             </button>
           </div>
         </div>
@@ -498,6 +583,11 @@ export function createOverlayView(
         return;
       }
 
+      if (overlayAction === 'clearSelection') {
+        currentHandlers?.onClearSelection?.();
+        return;
+      }
+
       if (overlayAction === 'closeShortcutSettings') {
         currentHandlers?.onCloseShortcutSettings?.();
         return;
@@ -538,6 +628,37 @@ export function createOverlayView(
         return;
       }
 
+      const sectionAction = target.dataset.sectionAction;
+
+      if (sectionAction) {
+        const sectionId = target.dataset.sectionId;
+
+        if (!sectionId) {
+          return;
+        }
+
+        if (sectionAction === 'nudgeSectionStartBackward') {
+          currentHandlers?.onNudgeSection?.(sectionId, 'start', -1);
+          return;
+        }
+
+        if (sectionAction === 'nudgeSectionStartForward') {
+          currentHandlers?.onNudgeSection?.(sectionId, 'start', 1);
+          return;
+        }
+
+        if (sectionAction === 'nudgeSectionEndBackward') {
+          currentHandlers?.onNudgeSection?.(sectionId, 'end', -1);
+          return;
+        }
+
+        if (sectionAction === 'nudgeSectionEndForward') {
+          currentHandlers?.onNudgeSection?.(sectionId, 'end', 1);
+        }
+
+        return;
+      }
+
       if (shortcutAction) {
         currentHandlers?.onShortcutAction?.(shortcutAction as ShortcutAction);
         return;
@@ -562,11 +683,15 @@ export function createOverlayView(
       const statusLabel = statusText
         ? `<span class="bp-overlay__restore">${escapeHtml(statusText)}</span>`
         : '<span class="bp-overlay__restore bp-overlay__restore--muted">Hover buttons to see the shortcuts. Open Shortcuts for setup.</span>';
+      const loopLabel = model.loopEnabled ? 'Loop On' : 'Loop Off';
+      const loopClass = model.loopEnabled
+        ? 'bp-overlay__loop bp-overlay__loop--on'
+        : 'bp-overlay__loop bp-overlay__loop--off';
 
       root.innerHTML = `
       <div class="bp-overlay">
           <div class="bp-overlay__status-row">
-            <span class="bp-overlay__loop">${model.loopEnabled ? 'Loop on' : 'Loop off'}</span>
+            <span class="${loopClass}">${escapeHtml(loopLabel)}</span>
             ${statusLabel}
           </div>
           <div class="bp-overlay__shell">

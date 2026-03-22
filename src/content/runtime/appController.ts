@@ -307,6 +307,7 @@ function toViewModel(
   now: number,
   markStartPending: boolean,
   videoDurationSec: number,
+  currentVideoTimeSec: number,
 ): OverlayViewModel {
   const selectedSection = session ? getSelectedSection(session) : null;
   const activeSection = session ? getActiveSection(session) : null;
@@ -323,6 +324,7 @@ function toViewModel(
     statusMessage,
     markStartPending,
     videoDurationSec,
+    currentVideoTimeSec,
     sections: (session?.sections ?? [])
       .slice()
       .sort((left, right) => left.order - right.order)
@@ -394,7 +396,10 @@ export function createAppController(deps: AppControllerDeps) {
       return;
     }
 
-      deps.overlay.render(
+    const videoDurationSec = deps.player.getDuration();
+    const currentVideoTimeSec = deps.player.getCurrentTime();
+
+    deps.overlay.render(
       toViewModel(
         session,
         currentSpeed,
@@ -403,7 +408,8 @@ export function createAppController(deps: AppControllerDeps) {
         statusMessage,
         getNow(),
         draftStartTimeSec !== null,
-        deps.player.getDuration(),
+        videoDurationSec,
+        currentVideoTimeSec,
       ),
     );
   };
@@ -527,6 +533,7 @@ export function createAppController(deps: AppControllerDeps) {
   };
 
   const handleSectionNudge = async (
+    sectionId: string | null,
     field: 'start' | 'end',
     direction: -1 | 1,
     stepSeconds: number = SMALL_NUDGE_STEP_SEC,
@@ -536,38 +543,40 @@ export function createAppController(deps: AppControllerDeps) {
       return;
     }
 
-    const selectedSection = getSelectedSection(session);
+    const targetSection = sectionId === null
+      ? getSelectedSection(session)
+      : getSectionById(session, sectionId);
 
-    if (!selectedSection) {
+    if (!targetSection) {
       renderSelectionRequired();
       return;
     }
 
     const duration = getSafeDuration(
       deps.player.getDuration(),
-      selectedSection.endTimeSec,
+      targetSection.endTimeSec,
     );
     const nextRange =
       field === 'start'
         ? clampSectionRange(
-          selectedSection.startTimeSec + direction * stepSeconds,
-          selectedSection.endTimeSec,
+          targetSection.startTimeSec + direction * stepSeconds,
+          targetSection.endTimeSec,
           duration,
         )
         : clampSectionRange(
-          selectedSection.startTimeSec,
-          selectedSection.endTimeSec + direction * stepSeconds,
+          targetSection.startTimeSec,
+          targetSection.endTimeSec + direction * stepSeconds,
           duration,
         );
 
-    session = updateSection(session, selectedSection.id, (section) => ({
+    session = updateSection(session, targetSection.id, (section) => ({
       ...section,
       ...nextRange,
       updatedAt: getNow(),
     }));
     statusMessage = null;
 
-    if (session.activeSectionId === selectedSection.id && field === 'start') {
+    if (session.activeSectionId === targetSection.id && field === 'start') {
       deps.player.setCurrentTime(nextRange.startTimeSec);
     }
 
@@ -650,6 +659,27 @@ export function createAppController(deps: AppControllerDeps) {
     }
 
     await deps.store.save(session);
+
+    if (!isActive()) {
+      return;
+    }
+
+    render();
+  };
+
+  const clearSelectionState = async () => {
+    if (!isActive() || !session) {
+      return;
+    }
+
+    if (!session.loopEnabled && session.selectedSectionId === null) {
+      return;
+    }
+
+    session = clearLoopState(session, { clearSelection: true });
+    statusMessage = null;
+
+    await saveSession();
 
     if (!isActive()) {
       return;
@@ -772,42 +802,42 @@ export function createAppController(deps: AppControllerDeps) {
         }
 
         if (action === 'nudgeSectionStartBackward') {
-          await handleSectionNudge('start', -1);
+          await handleSectionNudge(null, 'start', -1);
           return;
         }
 
         if (action === 'nudgeSectionStartForward') {
-          await handleSectionNudge('start', 1);
+          await handleSectionNudge(null, 'start', 1);
           return;
         }
 
         if (action === 'nudgeSectionEndBackward') {
-          await handleSectionNudge('end', -1);
+          await handleSectionNudge(null, 'end', -1);
           return;
         }
 
         if (action === 'nudgeSectionEndForward') {
-          await handleSectionNudge('end', 1);
+          await handleSectionNudge(null, 'end', 1);
           return;
         }
 
         if (action === 'nudgeSectionStartBackwardLarge') {
-          await handleSectionNudge('start', -1, BIG_NUDGE_STEP_SEC);
+          await handleSectionNudge(null, 'start', -1, BIG_NUDGE_STEP_SEC);
           return;
         }
 
         if (action === 'nudgeSectionStartForwardLarge') {
-          await handleSectionNudge('start', 1, BIG_NUDGE_STEP_SEC);
+          await handleSectionNudge(null, 'start', 1, BIG_NUDGE_STEP_SEC);
           return;
         }
 
         if (action === 'nudgeSectionEndBackwardLarge') {
-          await handleSectionNudge('end', -1, BIG_NUDGE_STEP_SEC);
+          await handleSectionNudge(null, 'end', -1, BIG_NUDGE_STEP_SEC);
           return;
         }
 
         if (action === 'nudgeSectionEndForwardLarge') {
-          await handleSectionNudge('end', 1, BIG_NUDGE_STEP_SEC);
+          await handleSectionNudge(null, 'end', 1, BIG_NUDGE_STEP_SEC);
           return;
         }
 
@@ -911,6 +941,19 @@ export function createAppController(deps: AppControllerDeps) {
         render();
       });
     },
+    async nudgeSection(
+      sectionId: string,
+      field: 'start' | 'end',
+      direction: -1 | 1,
+    ): Promise<void> {
+      await enqueue(async () => {
+        if (!session) {
+          return;
+        }
+
+        await handleSectionNudge(sectionId, field, direction);
+      });
+    },
     async selectSectionSlot(slotNumber: number): Promise<void> {
       await enqueue(async () => {
         if (!isActive() || !session) {
@@ -942,6 +985,9 @@ export function createAppController(deps: AppControllerDeps) {
       await enqueue(async () => {
         await deleteSectionById(sectionId, { skipConfirm: true });
       });
+    },
+    async clearSelection(): Promise<void> {
+      await enqueue(clearSelectionState);
     },
     async toggleLoop(sectionId?: string): Promise<void> {
       await enqueue(async () => {

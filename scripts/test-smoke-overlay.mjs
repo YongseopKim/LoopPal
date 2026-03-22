@@ -257,14 +257,17 @@ async function main() {
       return document.querySelectorAll('.bp-overlay__section').length === 2;
     }, { timeout: 5_000 });
 
-    const selectedMemo = page.locator('.bp-overlay__section--selected .bp-overlay__section-memo');
+    const selectedMemo = page.locator('.bp-overlay__section--selected .bp-overlay__section-inline-memo');
     await selectedMemo.waitFor({ timeout: 5_000 });
 
     console.log('Clicking a saved section row...');
     await page.click('[data-section-id="section-2"]');
-    await page.waitForFunction(() => {
-      return document.body.textContent?.includes('Looping Bridge fill') ?? false;
-    }, { timeout: 5_000 });
+    await page.waitForSelector(
+      '[data-section-id="section-2"][data-overlay-action="executeSection"].bp-overlay__section--active',
+      {
+      timeout: 5_000,
+      },
+    );
 
     const speedButtonTitle = await page.getAttribute(
       '[data-shortcut-action="increaseSpeed"]',

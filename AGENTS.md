@@ -19,6 +19,7 @@ LoopPal is a TypeScript Chrome extension with a strict `src` → `dist` flow.
 - `npm run test:watch`: run Vitest in watch mode.
 - `npm run test:smoke`: run the Playwright-based smoke check against the built bundle.
 - `npm run check`: run `npm run test && npm run build`.
+- Mandatory after code edits: run `npm run build`, `npm run test`, then `npm run test:smoke` (in this order).
 - For smoke tests on non-default Chrome paths:
   - `export BASS_PRACTICE_CHROME_BIN=/path/to/Chrome`
 

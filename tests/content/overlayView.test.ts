@@ -52,7 +52,7 @@ describe('overlayView', () => {
     expect(root.querySelector('.bp-overlay__panel')).not.toBeNull();
     expect(root.querySelectorAll('.bp-overlay__section')).toHaveLength(2);
     expect(root.textContent).toContain('memo: mute on beat 4');
-    expect(root.textContent).not.toContain('memo: lean into the pickup');
+    expect(root.textContent).toContain('memo: lean into the pickup');
   });
 
   it('renders hover help for buttons and row click affordances', () => {
@@ -92,7 +92,7 @@ describe('overlayView', () => {
     expect(loopToggleButton?.title).toContain('Loop');
     expect(secondSection?.title).toContain('Click to run this section');
     expect(root.textContent).toContain('Press a new shortcut');
-    expect(root.textContent).toContain('Select section 1');
+    expect(root.textContent).toContain('NEW');
     expect(root.querySelector('.bp-overlay__section--selected')).not.toBeNull();
     expect(root.querySelector('.bp-overlay__section--active')).not.toBeNull();
   });

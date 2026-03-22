@@ -166,8 +166,14 @@ function createBootstrapBinding(
       onDeleteSection(sectionId) {
         void controller?.deleteSection(sectionId).catch(reportRuntimeError);
       },
+      onNudgeSection(sectionId, field, direction) {
+        void controller?.nudgeSection(sectionId, field, direction).catch(reportRuntimeError);
+      },
       onToggleLoop(sectionId?: string) {
         void controller?.toggleLoop(sectionId).catch(reportRuntimeError);
+      },
+      onClearSelection() {
+        void controller?.clearSelection().catch(reportRuntimeError);
       },
       onOpenKeyGuide() {
         void controller?.handleShortcut('togglePanel').catch(reportRuntimeError);
