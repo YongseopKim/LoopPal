@@ -32,6 +32,39 @@ export function extractVideoId(rawUrl: string): string | null {
   }
 }
 
+export type PracticePanelMountMode = 'inline' | 'fixed';
+
+export function mountPracticePanel(
+  root: ParentNode,
+  panelRoot: HTMLElement,
+): PracticePanelMountMode {
+  const primaryInner = root.querySelector('#primary-inner');
+  const below = root.querySelector('#below');
+
+  if (
+    primaryInner instanceof HTMLElement &&
+    (!below || below.parentElement === primaryInner)
+  ) {
+    if (below instanceof HTMLElement) {
+      primaryInner.insertBefore(panelRoot, below);
+    } else if (panelRoot.parentElement !== primaryInner) {
+      primaryInner.append(panelRoot);
+    }
+
+    panelRoot.dataset.bpOverlayMode = 'inline';
+
+    return 'inline';
+  }
+
+  if (root instanceof Document && panelRoot.parentElement !== root.body) {
+    root.body.append(panelRoot);
+  }
+
+  panelRoot.dataset.bpOverlayMode = 'fixed';
+
+  return 'fixed';
+}
+
 type PageLocationLike = {
   href: string;
 };

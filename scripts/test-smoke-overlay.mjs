@@ -28,14 +28,26 @@ function createWatchPageHtml() {
         margin: 0;
         min-height: 100vh;
         background: #101522;
+        color: #f8f5ec;
+        font-family: system-ui, sans-serif;
       }
 
-      #movie_player {
+      #primary-inner {
         width: min(960px, calc(100vw - 32px));
         margin: 24px auto;
+      }
+
+      #player {
         padding: 16px;
         border-radius: 20px;
         background: #1a2230;
+      }
+
+      #below {
+        margin-top: 16px;
+        padding: 20px;
+        border-radius: 20px;
+        background: #151b26;
       }
 
       video {
@@ -47,8 +59,13 @@ function createWatchPageHtml() {
     </style>
   </head>
   <body>
-    <div id="movie_player">
-      <video class="html5-main-video"></video>
+    <div id="primary-inner">
+      <div id="player">
+        <div id="movie_player">
+          <video class="html5-main-video"></video>
+        </div>
+      </div>
+      <div id="below">Below content</div>
     </div>
   </body>
 </html>`;
@@ -132,6 +149,17 @@ async function main() {
     await page.waitForSelector('[data-bp-overlay-root] .bp-overlay__bar', {
       timeout: 5_000,
     });
+    await page.waitForFunction(() => {
+      const root = document.querySelector('[data-bp-overlay-root]');
+      const below = document.querySelector('#below');
+
+      return (
+        root instanceof HTMLElement &&
+        below instanceof HTMLElement &&
+        root.dataset.bpOverlayMode === 'inline' &&
+        root.nextElementSibling === below
+      );
+    }, { timeout: 5_000 });
 
     const overlay = page.locator('[data-bp-overlay-root] .bp-overlay');
     const overlayBox = await overlay.boundingBox();

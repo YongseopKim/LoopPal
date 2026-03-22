@@ -2,8 +2,8 @@
 
 Keyboard-first Chrome extension for `https://www.youtube.com/watch*` pages.
 It keeps bass practice sections in `chrome.storage.local`, restores the last
-session for each video, and adds a small always-visible overlay over the
-YouTube player.
+session for each video, and renders a small always-visible practice panel below
+the YouTube player.
 
 ## Current MVP
 
@@ -26,8 +26,9 @@ npm run build
 
 `npm run test` is the fast jsdom/unit suite.
 `npm run test:smoke` launches local Chrome through Playwright, loads the built
-content bundle on a routed YouTube watch page, and verifies that the overlay is
-visible in the viewport and responds to the section-start shortcut.
+content bundle on a routed YouTube watch page, and verifies that the panel is
+mounted below the player, stays visible in the viewport, and responds to the
+section-start shortcut.
 It is a real-browser smoke test for the built runtime, not a full Chrome
 extension installation test.
 

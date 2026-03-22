@@ -1,4 +1,10 @@
-[data-bp-overlay-root] {
+[data-bp-overlay-root][data-bp-overlay-mode="inline"] {
+  display: block;
+  width: 100%;
+  margin: 16px 0 0;
+}
+
+[data-bp-overlay-root][data-bp-overlay-mode="fixed"] {
   position: fixed;
   top: 16px;
   right: 16px;
@@ -19,6 +25,12 @@
     'Segoe UI',
     sans-serif;
   color: #f8f5ec;
+}
+
+[data-bp-overlay-root][data-bp-overlay-mode="inline"] .bp-overlay {
+  display: flex;
+  width: 100%;
+  max-width: none;
 }
 
 .bp-overlay__bar {

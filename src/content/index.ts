@@ -11,6 +11,7 @@ import {
 import {
   extractVideoId,
   isWatchPage,
+  mountPracticePanel,
   subscribeToPageNavigations,
 } from './runtime/youtubePage';
 import { createYoutubePlayer } from './runtime/youtubePlayer';
@@ -43,7 +44,6 @@ function ensureOverlayRoot() {
   const root = document.createElement('div');
 
   root.dataset.bpOverlayRoot = 'true';
-  document.body.append(root);
 
   return root;
 }
@@ -105,13 +105,15 @@ function createBootstrapBinding(
 
     const store = createSessionStore(chrome.storage.local);
     const player = createYoutubePlayer(video);
-    const overlay = createOverlayView(ensureOverlayRoot());
+    const overlayRoot = ensureOverlayRoot();
+    const overlay = createOverlayView(overlayRoot);
     const controller = createAppController({
       store,
       player,
       overlay: {
         render(model) {
           if (isActive()) {
+            mountPracticePanel(document, overlayRoot);
             overlay.render(model);
           }
         },

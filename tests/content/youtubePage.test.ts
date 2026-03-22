@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   extractVideoId,
   isWatchPage,
+  mountPracticePanel,
   subscribeToPageNavigations,
 } from '../../src/content/runtime/youtubePage';
 
@@ -51,6 +52,37 @@ function createFakeWindow(initialUrl: string) {
 }
 
 describe('youtubePage', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('mounts the practice panel below the player inside the primary column', () => {
+    document.body.innerHTML = `
+      <div id="primary-inner">
+        <div id="player"></div>
+        <div id="below"></div>
+      </div>
+    `;
+    const root = document.createElement('div');
+
+    root.dataset.bpOverlayRoot = 'true';
+
+    expect(mountPracticePanel(document, root)).toBe('inline');
+    expect(root.dataset.bpOverlayMode).toBe('inline');
+    expect(document.querySelector('#primary-inner')?.children[1]).toBe(root);
+    expect(root.nextElementSibling?.id).toBe('below');
+  });
+
+  it('falls back to a fixed overlay when the watch layout mount is unavailable', () => {
+    const root = document.createElement('div');
+
+    root.dataset.bpOverlayRoot = 'true';
+
+    expect(mountPracticePanel(document, root)).toBe('fixed');
+    expect(root.dataset.bpOverlayMode).toBe('fixed');
+    expect(document.body.lastElementChild).toBe(root);
+  });
+
   it('detects YouTube watch pages and extracts the video id', () => {
     expect(isWatchPage('https://www.youtube.com/watch?v=abc123')).toBe(true);
     expect(extractVideoId('https://www.youtube.com/watch?v=abc123&t=12')).toBe(
