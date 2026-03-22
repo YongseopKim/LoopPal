@@ -34,6 +34,15 @@ export function extractVideoId(rawUrl: string): string | null {
 
 export type PracticePanelMountMode = 'inline' | 'fixed';
 
+type WaitForInlinePracticePanelMountOptions = {
+  root: ParentNode;
+  panelRoot: HTMLElement;
+  isActive: () => boolean;
+  sleep: (ms: number) => Promise<void>;
+  intervalMs?: number;
+  maxAttempts?: number;
+};
+
 export function mountPracticePanel(
   root: ParentNode,
   panelRoot: HTMLElement,
@@ -63,6 +72,31 @@ export function mountPracticePanel(
   panelRoot.dataset.bpOverlayMode = 'fixed';
 
   return 'fixed';
+}
+
+export async function waitForInlinePracticePanelMount({
+  root,
+  panelRoot,
+  isActive,
+  sleep,
+  intervalMs = 50,
+  maxAttempts = 80,
+}: WaitForInlinePracticePanelMountOptions): Promise<PracticePanelMountMode> {
+  let mode: PracticePanelMountMode = 'fixed';
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    mode = mountPracticePanel(root, panelRoot);
+
+    if (mode === 'inline' || !isActive()) {
+      return mode;
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await sleep(intervalMs);
+    }
+  }
+
+  return mode;
 }
 
 type PageLocationLike = {

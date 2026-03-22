@@ -4,6 +4,7 @@ import {
   isWatchPage,
   mountPracticePanel,
   subscribeToPageNavigations,
+  waitForInlinePracticePanelMount,
 } from '../../src/content/runtime/youtubePage';
 
 function createFakeWindow(initialUrl: string) {
@@ -81,6 +82,33 @@ describe('youtubePage', () => {
     expect(mountPracticePanel(document, root)).toBe('fixed');
     expect(root.dataset.bpOverlayMode).toBe('fixed');
     expect(document.body.lastElementChild).toBe(root);
+  });
+
+  it('retries until the inline practice panel mount becomes available', async () => {
+    const root = document.createElement('div');
+    const sleep = vi.fn().mockImplementation(async () => {
+      document.body.innerHTML = `
+        <div id="primary-inner">
+          <div id="player"></div>
+          <div id="below"></div>
+        </div>
+      `;
+    });
+
+    root.dataset.bpOverlayRoot = 'true';
+
+    await expect(
+      waitForInlinePracticePanelMount({
+        root: document,
+        panelRoot: root,
+        isActive: () => true,
+        sleep,
+        maxAttempts: 2,
+      }),
+    ).resolves.toBe('inline');
+
+    expect(root.dataset.bpOverlayMode).toBe('inline');
+    expect(document.querySelector('#primary-inner')?.children[1]).toBe(root);
   });
 
   it('detects YouTube watch pages and extracts the video id', () => {

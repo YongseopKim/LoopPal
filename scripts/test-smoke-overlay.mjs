@@ -59,14 +59,35 @@ function createWatchPageHtml() {
     </style>
   </head>
   <body>
-    <div id="primary-inner">
-      <div id="player">
-        <div id="movie_player">
-          <video class="html5-main-video"></video>
-        </div>
+    <div id="shell">
+      <div id="movie_player">
+        <video class="html5-main-video"></video>
       </div>
-      <div id="below">Below content</div>
     </div>
+    <script>
+      window.setTimeout(() => {
+        const shell = document.querySelector('#shell');
+        const moviePlayer = shell?.querySelector('#movie_player');
+
+        if (!shell || !moviePlayer) {
+          return;
+        }
+
+        const primaryInner = document.createElement('div');
+        primaryInner.id = 'primary-inner';
+
+        const player = document.createElement('div');
+        player.id = 'player';
+        player.append(moviePlayer);
+
+        const below = document.createElement('div');
+        below.id = 'below';
+        below.textContent = 'Below content';
+
+        primaryInner.append(player, below);
+        shell.replaceWith(primaryInner);
+      }, 120);
+    </script>
   </body>
 </html>`;
 }

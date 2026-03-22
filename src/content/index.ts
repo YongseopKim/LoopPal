@@ -13,6 +13,7 @@ import {
   isWatchPage,
   mountPracticePanel,
   subscribeToPageNavigations,
+  waitForInlinePracticePanelMount,
 } from './runtime/youtubePage';
 import { createYoutubePlayer } from './runtime/youtubePlayer';
 import { createOverlayView } from './ui/overlayView';
@@ -127,6 +128,14 @@ function createBootstrapBinding(
     if (!isActive()) {
       return;
     }
+
+    void waitForInlinePracticePanelMount({
+      root: document,
+      panelRoot: overlayRoot,
+      isActive,
+      sleep,
+      intervalMs: VIDEO_LOOKUP_INTERVAL_MS,
+    }).catch(reportRuntimeError);
 
     const shortcutController = createShortcutController({
       onAction(action) {
