@@ -128,10 +128,21 @@ export BASS_PRACTICE_CHROME_BIN=/path/to/Chrome.app/Contents/MacOS/Google\ Chrom
 
 ### Loading in Chrome
 
-1. Open `chrome://extensions`
-2. Enable `Developer mode`
-3. Click `Load unpacked`
-4. Select this project’s `dist/` folder
+1. Download the latest release package:
+   [LoopPal latest](https://github.com/YongseopKim/LoopPal/releases/latest/download/looppal-chrome-extension.zip)
+2. Unzip `looppal-chrome-extension.zip`
+3. Open `chrome://extensions`
+4. Enable `Developer mode`
+5. Click `Load unpacked`
+6. Select the unzipped folder
+
+You can also build locally and load `dist/` directly if you prefer.
+
+### Release flow
+
+- `main` branch pushes keep a build artifact in GitHub Actions.
+- Creating a tag that matches `v*` (예: `v0.1.0`) publishes a release and uploads
+  `looppal-chrome-extension.zip` as an asset.
 
 ## Manual QA Checklist
 
