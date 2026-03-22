@@ -1,8 +1,18 @@
+[data-bp-overlay-root] {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2147483647;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
 .bp-overlay {
   display: inline-flex;
   flex-direction: column;
   min-width: 240px;
   max-width: min(320px, 100%);
+  pointer-events: auto;
   font-family:
     'Avenir Next',
     Avenir,

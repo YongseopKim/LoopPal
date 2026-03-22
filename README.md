@@ -20,8 +20,19 @@ YouTube player.
 ```bash
 npm install
 npm run test
+npm run test:smoke
 npm run build
 ```
+
+`npm run test` is the fast jsdom/unit suite.
+`npm run test:smoke` launches local Chrome through Playwright, loads the built
+content bundle on a routed YouTube watch page, and verifies that the overlay is
+visible in the viewport and responds to the section-start shortcut.
+It is a real-browser smoke test for the built runtime, not a full Chrome
+extension installation test.
+
+If Chrome is not installed in the default macOS location, set
+`BASS_PRACTICE_CHROME_BIN` to a local Chrome or Chromium binary.
 
 ## Load In Chrome
 
@@ -61,16 +72,17 @@ shortcuts can create the initial per-video session state.
 
 ## Manual QA Checklist
 
-1. Run `npm run build`.
-2. Load `dist/` as an unpacked extension in Chrome.
-3. Open a `https://www.youtube.com/watch*` page.
-4. Create two sections with `;` then `'`, and confirm the name/memo prompts save.
-5. Toggle the section list with `/` and confirm the selected and active states are visible.
-6. Use `[` and `]` to change selection, then `\` to execute the selected loop.
-7. Use `-`, `=`, `,`, `.` and confirm the selected loop boundaries move in `0.1s` steps.
-8. Use `O` and `P` and confirm playback rate changes in `0.05x` steps.
-9. Refresh the page and confirm the previous session restores.
-10. Navigate to a different watch page and confirm the runtime rebinds to the new player.
+1. Run `npm run test:smoke`.
+2. Run `npm run build`.
+3. Load `dist/` as an unpacked extension in Chrome.
+4. Open a `https://www.youtube.com/watch*` page.
+5. Create two sections with `;` then `'`, and confirm the name/memo prompts save.
+6. Toggle the section list with `/` and confirm the selected and active states are visible.
+7. Use `[` and `]` to change selection, then `\` to execute the selected loop.
+8. Use `-`, `=`, `,`, `.` and confirm the selected loop boundaries move in `0.1s` steps.
+9. Use `O` and `P` and confirm playback rate changes in `0.05x` steps.
+10. Refresh the page and confirm the previous session restores.
+11. Navigate to a different watch page and confirm the runtime rebinds to the new player.
 
 ## Notes
 
