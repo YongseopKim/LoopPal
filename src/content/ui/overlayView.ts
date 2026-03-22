@@ -1,4 +1,10 @@
-import { DEFAULT_KEYMAP, type ShortcutAction } from '../runtime/defaultKeymap';
+import {
+  SHORTCUT_ACTION_GROUPS,
+  SHORTCUT_ACTION_META,
+  formatShortcutForAction,
+  type ShortcutAction,
+  type ShortcutKeymap,
+} from '../runtime/defaultKeymap';
 
 export type OverlaySectionSummary = {
   id: string;
@@ -19,63 +25,48 @@ export type OverlayViewModel = {
   sections: OverlaySectionSummary[];
 };
 
+export type OverlayShortcutModalState = {
+  isOpen: boolean;
+  captureAction: ShortcutAction | null;
+  statusMessage: string | null;
+};
+
+export type OverlayScreenModel = {
+  practice: OverlayViewModel;
+  shortcutKeymap: ShortcutKeymap;
+  shortcutModal: OverlayShortcutModalState;
+};
+
 type OverlayViewHandlers = {
   onShortcutAction?: (action: ShortcutAction) => void;
   onExecuteSection?: (sectionId: string) => void;
+  onDeleteSection?: (sectionId: string) => void;
   onToggleLoop?: () => void;
+  onOpenShortcutSettings?: () => void;
+  onCloseShortcutSettings?: () => void;
+  onBeginShortcutCapture?: (action: ShortcutAction) => void;
+  onResetShortcut?: (action: ShortcutAction) => void;
+  onResetAllShortcuts?: () => void;
 };
 
 const OVERLAY_VIEW_HANDLERS = new WeakMap<HTMLElement, OverlayViewHandlers>();
 const OVERLAY_VIEW_BOUND_ROOTS = new WeakSet<HTMLElement>();
 
-type OverlayControlSpec = {
+type ToolbarButtonSpec = {
   action: ShortcutAction;
   label: string;
-  description: string;
 };
 
-const CONTROL_SPECS: OverlayControlSpec[] = [
-  {
-    action: 'decreaseSpeed',
-    label: 'Speed -',
-    description: 'Decrease speed',
-  },
-  {
-    action: 'increaseSpeed',
-    label: 'Speed +',
-    description: 'Increase speed',
-  },
-  {
-    action: 'nudgeSectionStartBackward',
-    label: 'Start -0.1',
-    description: 'Move section start earlier by 0.1s',
-  },
-  {
-    action: 'nudgeSectionStartForward',
-    label: 'Start +0.1',
-    description: 'Move section start later by 0.1s',
-  },
-  {
-    action: 'nudgeSectionEndBackward',
-    label: 'End -0.1',
-    description: 'Move section end earlier by 0.1s',
-  },
-  {
-    action: 'nudgeSectionEndForward',
-    label: 'End +0.1',
-    description: 'Move section end later by 0.1s',
-  },
-  {
-    action: 'markSectionStart',
-    label: 'Mark Start',
-    description: 'Mark the current playback time as the section start',
-  },
-  {
-    action: 'markSectionEnd',
-    label: 'Mark End',
-    description: 'Save the section using the current playback time as the end',
-  },
-];
+const TOOLBAR_BUTTONS: readonly ToolbarButtonSpec[] = [
+  { action: 'decreaseSpeed', label: 'Speed -' },
+  { action: 'increaseSpeed', label: 'Speed +' },
+  { action: 'nudgeSectionStartBackward', label: 'Start -0.1' },
+  { action: 'nudgeSectionStartForward', label: 'Start +0.1' },
+  { action: 'nudgeSectionEndBackward', label: 'End -0.1' },
+  { action: 'nudgeSectionEndForward', label: 'End +0.1' },
+  { action: 'markSectionStart', label: 'Mark Start' },
+  { action: 'markSectionEnd', label: 'Mark End' },
+] as const;
 
 function escapeHtml(value: string): string {
   return value
@@ -86,86 +77,41 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
-function getShortcutLabel(action: ShortcutAction): string {
-  const code = DEFAULT_KEYMAP[action];
+function renderControlButton(
+  keymap: ShortcutKeymap,
+  spec: ToolbarButtonSpec,
+): string {
+  const actionMeta = SHORTCUT_ACTION_META[spec.action];
 
-  switch (code) {
-    case 'BracketLeft':
-      return '[';
-    case 'BracketRight':
-      return ']';
-    case 'Backslash':
-      return '\\';
-    case 'Slash':
-      return '/';
-    case 'Semicolon':
-      return ';';
-    case 'Quote':
-      return "'";
-    case 'Minus':
-      return '-';
-    case 'Equal':
-      return '=';
-    case 'Comma':
-      return ',';
-    case 'Period':
-      return '.';
-    case 'KeyO':
-      return 'O';
-    case 'KeyP':
-      return 'P';
-    default:
-      return code;
-  }
-}
-
-function describeShortcut(action: ShortcutAction): string {
-  return `${getShortcutLabel(action)}`;
-}
-
-function renderControlButton(spec: OverlayControlSpec): string {
   return `
     <button
       type="button"
       class="bp-overlay__control-button"
       data-shortcut-action="${spec.action}"
-      title="${escapeHtml(`${spec.description} (${describeShortcut(spec.action)})`)}"
+      title="${escapeHtml(`${actionMeta.description} (${formatShortcutForAction(keymap, spec.action)})`)}"
     >
       ${escapeHtml(spec.label)}
     </button>
   `;
 }
 
-function renderLegend(): string {
-  const legendRows = [
-    ['Prev section', 'selectPreviousSection'],
-    ['Next section', 'selectNextSection'],
-    ['Run selected', 'executeSelectedSection'],
-    ['Toggle key guide', 'togglePanel'],
-    ['Mark start', 'markSectionStart'],
-    ['Mark end', 'markSectionEnd'],
-    ['Start -0.1', 'nudgeSectionStartBackward'],
-    ['Start +0.1', 'nudgeSectionStartForward'],
-    ['End -0.1', 'nudgeSectionEndBackward'],
-    ['End +0.1', 'nudgeSectionEndForward'],
-    ['Speed -', 'decreaseSpeed'],
-    ['Speed +', 'increaseSpeed'],
-  ] as const;
-
+function renderLegend(keymap: ShortcutKeymap): string {
   return `
     <div class="bp-overlay__legend">
       <p class="bp-overlay__legend-title">Keyboard shortcuts</p>
       <div class="bp-overlay__legend-grid">
-        ${legendRows
-          .map(
-            ([label, action]) => `
+        ${SHORTCUT_ACTION_GROUPS.flatMap((group) =>
+          group.actions.map((action) => {
+            const meta = SHORTCUT_ACTION_META[action];
+
+            return `
               <div class="bp-overlay__legend-row">
-                <span>${escapeHtml(label)}</span>
-                <kbd>${escapeHtml(describeShortcut(action))}</kbd>
+                <span>${escapeHtml(meta.label)}</span>
+                <kbd>${escapeHtml(formatShortcutForAction(keymap, action))}</kbd>
               </div>
-            `,
-          )
-          .join('')}
+            `;
+          }),
+        ).join('')}
       </div>
     </div>
   `;
@@ -193,8 +139,12 @@ function renderSections(model: OverlayViewModel): string {
       const isSelected = section.id === model.selectedSectionId;
       const isActive = section.id === model.activeSectionId;
       const badges = [
-        isSelected ? '<span class="bp-overlay__badge bp-overlay__badge--selected">Selected</span>' : '',
-        isActive ? '<span class="bp-overlay__badge bp-overlay__badge--active">Looping</span>' : '',
+        isSelected
+          ? '<span class="bp-overlay__badge bp-overlay__badge--selected">Selected</span>'
+          : '',
+        isActive
+          ? '<span class="bp-overlay__badge bp-overlay__badge--active">Looping</span>'
+          : '',
       ]
         .filter(Boolean)
         .join('');
@@ -205,18 +155,30 @@ function renderSections(model: OverlayViewModel): string {
 
       return `
         <li>
-          <button
-            type="button"
-            class="bp-overlay__section${isSelected ? ' bp-overlay__section--selected' : ''}${isActive ? ' bp-overlay__section--active' : ''}"
-            data-section-id="${escapeHtml(section.id)}"
-            title="Click to run this section immediately"
-          >
-            <span class="bp-overlay__section-topline">
-              <strong class="bp-overlay__section-name">${escapeHtml(section.name)}</strong>
-              <span class="bp-overlay__section-badges">${badges}</span>
-            </span>
-            ${memo}
-          </button>
+          <div class="bp-overlay__section-row">
+            <button
+              type="button"
+              class="bp-overlay__section${isSelected ? ' bp-overlay__section--selected' : ''}${isActive ? ' bp-overlay__section--active' : ''}"
+              data-overlay-action="executeSection"
+              data-section-id="${escapeHtml(section.id)}"
+              title="Click to run this section immediately"
+            >
+              <span class="bp-overlay__section-topline">
+                <strong class="bp-overlay__section-name">${escapeHtml(section.name)}</strong>
+                <span class="bp-overlay__section-badges">${badges}</span>
+              </span>
+              ${memo}
+            </button>
+            <button
+              type="button"
+              class="bp-overlay__section-delete"
+              data-overlay-action="deleteSection"
+              data-section-id="${escapeHtml(section.id)}"
+              title="Delete this section"
+            >
+              Delete
+            </button>
+          </div>
         </li>
       `;
     })
@@ -236,10 +198,11 @@ function renderSections(model: OverlayViewModel): string {
   `;
 }
 
-function renderToolbar(model: OverlayViewModel): string {
+function renderToolbar(screen: OverlayScreenModel): string {
+  const model = screen.practice;
   const loopTitle = model.loopEnabled
     ? 'Loop off: stop repeating the active section (button only)'
-    : `Loop on: run the selected section and start looping it (${describeShortcut('executeSelectedSection')})`;
+    : `Loop on: run the selected section and start looping it (${formatShortcutForAction(screen.shortcutKeymap, 'executeSelectedSection')})`;
   const loopLabel = model.loopEnabled ? 'Loop Off' : 'Loop On';
   const activeSummary = model.activeSectionName
     ? `Looping ${model.activeSectionName}`
@@ -255,26 +218,26 @@ function renderToolbar(model: OverlayViewModel): string {
       </div>
 
       <div class="bp-overlay__toolbar-group bp-overlay__toolbar-group--speed">
-        ${renderControlButton(CONTROL_SPECS[0])}
+        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[0])}
         <span class="bp-overlay__speed-chip" title="Current playback speed">
           ${escapeHtml(model.speedLabel)}
         </span>
-        ${renderControlButton(CONTROL_SPECS[1])}
+        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[1])}
       </div>
 
       <div class="bp-overlay__toolbar-group">
-        ${renderControlButton(CONTROL_SPECS[2])}
-        ${renderControlButton(CONTROL_SPECS[3])}
+        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[2])}
+        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[3])}
       </div>
 
       <div class="bp-overlay__toolbar-group">
-        ${renderControlButton(CONTROL_SPECS[4])}
-        ${renderControlButton(CONTROL_SPECS[5])}
+        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[4])}
+        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[5])}
       </div>
 
       <div class="bp-overlay__toolbar-group">
-        ${renderControlButton(CONTROL_SPECS[6])}
-        ${renderControlButton(CONTROL_SPECS[7])}
+        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[6])}
+        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[7])}
         <button
           type="button"
           class="bp-overlay__control-button bp-overlay__control-button--loop"
@@ -283,6 +246,109 @@ function renderToolbar(model: OverlayViewModel): string {
         >
           ${escapeHtml(loopLabel)}
         </button>
+        <button
+          type="button"
+          class="bp-overlay__control-button bp-overlay__control-button--settings"
+          data-overlay-action="openShortcutSettings"
+          title="Open shortcut settings"
+        >
+          Shortcuts
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderShortcutModal(screen: OverlayScreenModel): string {
+  if (!screen.shortcutModal.isOpen) {
+    return '';
+  }
+
+  const captureAction = screen.shortcutModal.captureAction;
+  const statusMessage =
+    screen.shortcutModal.statusMessage ??
+    (captureAction
+      ? `Press a new shortcut for ${SHORTCUT_ACTION_META[captureAction].label}`
+      : 'Click Change to remap a shortcut. Direct section select maps to the saved section list order.');
+
+  return `
+    <div class="bp-overlay__modal-backdrop">
+      <div class="bp-overlay__modal" role="dialog" aria-modal="true" aria-label="Shortcut settings">
+        <div class="bp-overlay__modal-header">
+          <div>
+            <p class="bp-overlay__modal-title">Shortcut Settings</p>
+            <p class="bp-overlay__modal-subtitle">${escapeHtml(statusMessage)}</p>
+          </div>
+          <button
+            type="button"
+            class="bp-overlay__modal-close"
+            data-overlay-action="closeShortcutSettings"
+            title="Close shortcut settings"
+          >
+            Close
+          </button>
+        </div>
+        <div class="bp-overlay__modal-groups">
+          ${SHORTCUT_ACTION_GROUPS.map((group) => {
+            const rows = group.actions
+              .map((action) => {
+                const meta = SHORTCUT_ACTION_META[action];
+                const isCapturing = action === captureAction;
+
+                return `
+                  <div class="bp-overlay__modal-row${isCapturing ? ' bp-overlay__modal-row--capturing' : ''}">
+                    <div class="bp-overlay__modal-copy">
+                      <strong>${escapeHtml(meta.label)}</strong>
+                      <p>${escapeHtml(meta.description)}</p>
+                    </div>
+                    <div class="bp-overlay__modal-actions">
+                      <span class="bp-overlay__binding-chip">${escapeHtml(formatShortcutForAction(screen.shortcutKeymap, action))}</span>
+                      <button
+                        type="button"
+                        class="bp-overlay__modal-button"
+                        data-overlay-action="beginShortcutCapture"
+                        data-shortcut-action="${action}"
+                      >
+                        ${isCapturing ? 'Listening…' : 'Change'}
+                      </button>
+                      <button
+                        type="button"
+                        class="bp-overlay__modal-button bp-overlay__modal-button--muted"
+                        data-overlay-action="resetShortcut"
+                        data-shortcut-action="${action}"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                `;
+              })
+              .join('');
+
+            return `
+              <section class="bp-overlay__modal-group">
+                <h3>${escapeHtml(group.label)}</h3>
+                ${rows}
+              </section>
+            `;
+          }).join('')}
+        </div>
+        <div class="bp-overlay__modal-footer">
+          <button
+            type="button"
+            class="bp-overlay__modal-button bp-overlay__modal-button--muted"
+            data-overlay-action="resetAllShortcuts"
+          >
+            Reset all
+          </button>
+          <button
+            type="button"
+            class="bp-overlay__modal-button"
+            data-overlay-action="closeShortcutSettings"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -308,15 +374,61 @@ export function createOverlayView(
       }
 
       const currentHandlers = OVERLAY_VIEW_HANDLERS.get(root);
+      const overlayAction = target.dataset.overlayAction;
       const shortcutAction = target.dataset.shortcutAction;
 
-      if (shortcutAction) {
-        currentHandlers?.onShortcutAction?.(shortcutAction as ShortcutAction);
+      if (overlayAction === 'toggleLoop') {
+        currentHandlers?.onToggleLoop?.();
         return;
       }
 
-      if (target.dataset.overlayAction === 'toggleLoop') {
-        currentHandlers?.onToggleLoop?.();
+      if (overlayAction === 'openShortcutSettings') {
+        currentHandlers?.onOpenShortcutSettings?.();
+        return;
+      }
+
+      if (overlayAction === 'closeShortcutSettings') {
+        currentHandlers?.onCloseShortcutSettings?.();
+        return;
+      }
+
+      if (overlayAction === 'beginShortcutCapture' && shortcutAction) {
+        currentHandlers?.onBeginShortcutCapture?.(shortcutAction as ShortcutAction);
+        return;
+      }
+
+      if (overlayAction === 'resetShortcut' && shortcutAction) {
+        currentHandlers?.onResetShortcut?.(shortcutAction as ShortcutAction);
+        return;
+      }
+
+      if (overlayAction === 'resetAllShortcuts') {
+        currentHandlers?.onResetAllShortcuts?.();
+        return;
+      }
+
+      if (overlayAction === 'executeSection') {
+        const sectionId = target.dataset.sectionId;
+
+        if (sectionId) {
+          currentHandlers?.onExecuteSection?.(sectionId);
+        }
+
+        return;
+      }
+
+      if (overlayAction === 'deleteSection') {
+        const sectionId = target.dataset.sectionId;
+
+        if (sectionId) {
+          currentHandlers?.onDeleteSection?.(sectionId);
+        }
+
+        return;
+      }
+
+      if (shortcutAction) {
+        currentHandlers?.onShortcutAction?.(shortcutAction as ShortcutAction);
         return;
       }
 
@@ -331,7 +443,8 @@ export function createOverlayView(
   }
 
   return {
-    render(model: OverlayViewModel) {
+    render(screen: OverlayScreenModel) {
+      const model = screen.practice;
       const statusText =
         model.statusMessage ??
         (model.restoreStatus === 'blocked' ? 'Tap play to resume loop' : '');
@@ -341,13 +454,14 @@ export function createOverlayView(
 
       root.innerHTML = `
         <div class="bp-overlay">
-          ${renderToolbar(model)}
+          ${renderToolbar(screen)}
           <div class="bp-overlay__status-row">
             <span class="bp-overlay__loop">${model.loopEnabled ? 'Loop on' : 'Loop off'}</span>
             ${statusLabel}
           </div>
           ${renderSections(model)}
-          ${model.panelExpanded ? renderLegend() : ''}
+          ${model.panelExpanded ? renderLegend(screen.shortcutKeymap) : ''}
+          ${renderShortcutModal(screen)}
         </div>
       `;
     },

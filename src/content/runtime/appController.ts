@@ -42,6 +42,7 @@ export type AppControllerDeps = {
   promptForSectionDetails?: (
     defaults: SectionDetails,
   ) => SectionDetails | null;
+  confirmDelete?: (message: string) => boolean;
 };
 
 export type RestoreResult = {
@@ -66,12 +67,72 @@ function getSectionById(
   return session.sections.find((section) => section.id === sectionId) ?? null;
 }
 
+function getOrderedSections(session: VideoPracticeSession): PracticeSection[] {
+  return [...session.sections].sort((left, right) => left.order - right.order);
+}
+
 function getSelectedSection(session: VideoPracticeSession): PracticeSection | null {
   return getSectionById(session, session.selectedSectionId);
 }
 
 function getActiveSection(session: VideoPracticeSession): PracticeSection | null {
   return getSectionById(session, session.activeSectionId);
+}
+
+function getSectionSlotIndex(
+  session: VideoPracticeSession,
+  sectionId: string,
+): number {
+  return getOrderedSections(session).findIndex((section) => section.id === sectionId);
+}
+
+function findNextSelectedSectionId(
+  session: VideoPracticeSession,
+  removedIndex: number,
+): string | null {
+  const orderedSections = getOrderedSections(session);
+
+  if (orderedSections.length === 0) {
+    return null;
+  }
+
+  if (removedIndex >= orderedSections.length) {
+    return orderedSections[orderedSections.length - 1]?.id ?? null;
+  }
+
+  return orderedSections[removedIndex]?.id ?? null;
+}
+
+function removeSectionFromSession(
+  session: VideoPracticeSession,
+  sectionId: string,
+): VideoPracticeSession {
+  const removedIndex = getSectionSlotIndex(session, sectionId);
+  const nextSections = session.sections.filter((section) => section.id !== sectionId);
+  const nextSession = { ...session, sections: nextSections };
+
+  if (removedIndex === -1) {
+    return nextSession;
+  }
+
+  const selectedSectionId =
+    nextSections.length === 0
+      ? null
+      : session.selectedSectionId === sectionId
+        ? findNextSelectedSectionId(
+          { ...nextSession, selectedSectionId: null },
+          removedIndex,
+        )
+        : session.selectedSectionId;
+
+  const isDeletedActive = session.activeSectionId === sectionId;
+
+  return {
+    ...nextSession,
+    selectedSectionId,
+    activeSectionId: isDeletedActive ? null : nextSession.activeSectionId,
+    loopEnabled: isDeletedActive ? false : nextSession.loopEnabled,
+  };
 }
 
 function normalizeSessionState(
@@ -227,6 +288,15 @@ export function createAppController(deps: AppControllerDeps) {
         },
         defaults.name,
       );
+    });
+  const confirmDelete =
+    deps.confirmDelete ??
+    ((message: string) => {
+      try {
+        return window.confirm(message);
+      } catch {
+        return true;
+      }
     });
   let session: VideoPracticeSession | null = null;
   let panelExpanded = false;
@@ -502,6 +572,51 @@ export function createAppController(deps: AppControllerDeps) {
     render();
   };
 
+  const deleteSectionById = async (
+    sectionId: string,
+    options: { skipConfirm?: boolean } = {},
+  ) => {
+    if (!isActive() || !session) {
+      return;
+    }
+
+    const targetSection = getSectionById(session, sectionId);
+
+    if (!targetSection) {
+      return;
+    }
+
+    const shouldDelete = options.skipConfirm || confirmDelete(
+      `Delete ${targetSection.name}?`,
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    session = removeSectionFromSession(session, sectionId);
+    statusMessage = `Deleted ${targetSection.name}`;
+
+    await deps.store.save(session);
+
+    if (!isActive()) {
+      return;
+    }
+
+    render();
+  };
+
+  const deleteSelectedSection = async () => {
+    const selected = session ? getSelectedSection(session) : null;
+
+    if (!selected) {
+      renderSelectionRequired();
+      return;
+    }
+
+    await deleteSectionById(selected.id);
+  };
+
   return {
     async start(): Promise<RestoreResult> {
       currentSpeed = deps.player.getPlaybackRate();
@@ -623,6 +738,11 @@ export function createAppController(deps: AppControllerDeps) {
 
         if (action === 'executeSelectedSection') {
           await executeSelectedSection();
+          return;
+        }
+
+        if (action === 'deleteSelectedSection') {
+          await deleteSelectedSection();
         }
       });
     },
@@ -659,6 +779,38 @@ export function createAppController(deps: AppControllerDeps) {
         }
 
         render();
+      });
+    },
+    async selectSectionSlot(slotNumber: number): Promise<void> {
+      await enqueue(async () => {
+        if (!isActive() || !session) {
+          return;
+        }
+
+        const targetSection = getOrderedSections(session)[slotNumber - 1];
+
+        if (!targetSection) {
+          return;
+        }
+
+        session = {
+          ...session,
+          selectedSectionId: targetSection.id,
+        };
+        statusMessage = null;
+
+        await deps.store.save(session);
+
+        if (!isActive()) {
+          return;
+        }
+
+        render();
+      });
+    },
+    async deleteSection(sectionId: string): Promise<void> {
+      await enqueue(async () => {
+        await deleteSectionById(sectionId, { skipConfirm: true });
       });
     },
     async toggleLoop(): Promise<void> {

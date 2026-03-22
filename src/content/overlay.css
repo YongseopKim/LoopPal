@@ -4,6 +4,10 @@
   margin: 16px 0 0;
 }
 
+[data-bp-overlay-root][data-bp-overlay-pending] {
+  visibility: hidden;
+}
+
 [data-bp-overlay-root][data-bp-overlay-mode="fixed"] {
   position: fixed;
   top: 16px;
@@ -197,9 +201,17 @@
   list-style: none;
 }
 
+.bp-overlay__section-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
 .bp-overlay__section {
   display: block;
   width: 100%;
+  min-width: 0;
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 16px;
@@ -218,6 +230,23 @@
   transform: translateY(-1px);
   border-color: rgba(241, 190, 103, 0.34);
   background: rgba(241, 190, 103, 0.12);
+}
+
+.bp-overlay__section-delete {
+  height: 100%;
+  padding: 0 12px;
+  min-height: 40px;
+  border: 1px solid rgba(255, 248, 236, 0.22);
+  border-radius: 14px;
+  background: rgba(255, 113, 113, 0.13);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.bp-overlay__section-delete:hover {
+  border-color: rgba(255, 188, 188, 0.6);
+  background: rgba(255, 132, 132, 0.22);
 }
 
 .bp-overlay__section--selected {
@@ -309,6 +338,171 @@
   background: rgba(255, 255, 255, 0.06);
   font: inherit;
   text-align: center;
+}
+
+.bp-overlay__control-button--settings {
+  background: rgba(243, 205, 130, 0.16);
+  border-color: rgba(243, 205, 130, 0.34);
+}
+
+.bp-overlay__modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 12px;
+  background: rgba(7, 11, 18, 0.48);
+  backdrop-filter: blur(2px);
+  animation: bp-overlay-fadein 120ms ease-out;
+  pointer-events: auto;
+}
+
+.bp-overlay__modal {
+  width: min(920px, 100%);
+  max-height: min(78vh, 720px);
+  overflow: auto;
+  border: 1px solid rgba(255, 248, 236, 0.16);
+  border-radius: 18px;
+  padding: 14px;
+  background:
+    linear-gradient(160deg, rgba(17, 22, 30, 0.98), rgba(29, 36, 48, 0.96));
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
+}
+
+.bp-overlay__modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bp-overlay__modal-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bp-overlay__modal-subtitle {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.78;
+  max-width: 720px;
+}
+
+.bp-overlay__modal-close {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 248, 236, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.bp-overlay__modal-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.bp-overlay__modal-group {
+  border: 1px solid rgba(255, 248, 236, 0.1);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bp-overlay__modal-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 248, 236, 0.06);
+}
+
+.bp-overlay__modal-row--capturing {
+  background: rgba(243, 205, 130, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(243, 205, 130, 0.34) inset;
+}
+
+.bp-overlay__modal-copy {
+  min-width: 0;
+}
+
+.bp-overlay__modal-copy strong {
+  display: block;
+  font-size: 13px;
+}
+
+.bp-overlay__modal-copy p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  opacity: 0.74;
+}
+
+.bp-overlay__modal-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.bp-overlay__binding-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  min-width: 78px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 248, 236, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  font: inherit;
+  font-size: 11px;
+}
+
+.bp-overlay__modal-button {
+  min-height: 34px;
+  border: 1px solid rgba(255, 248, 236, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  padding: 0 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.bp-overlay__modal-button--muted {
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bp-overlay__modal-button:hover,
+.bp-overlay__modal-close:hover {
+  border-color: rgba(243, 205, 130, 0.42);
+  background: rgba(243, 205, 130, 0.12);
+}
+
+.bp-overlay__modal-footer {
+  margin-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+@keyframes bp-overlay-fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 720px) {

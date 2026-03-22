@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   createOverlayView,
+  type OverlayScreenModel,
   type OverlayViewModel,
 } from '../../src/content/ui/overlayView';
+import { createShortcutKeymap } from '../../src/content/runtime/defaultKeymap';
 
 const viewModel: OverlayViewModel = {
   selectedSectionName: 'Chorus groove',
@@ -27,12 +29,22 @@ const viewModel: OverlayViewModel = {
   ],
 };
 
+const screenModel: OverlayScreenModel = {
+  practice: viewModel,
+  shortcutKeymap: createShortcutKeymap(),
+  shortcutModal: {
+    isOpen: false,
+    captureAction: null,
+    statusMessage: null,
+  },
+};
+
 describe('overlayView', () => {
   it('renders the control bar and always-visible section list', () => {
     const root = document.createElement('div');
     const view = createOverlayView(root);
 
-    view.render(viewModel);
+    view.render(screenModel);
 
     expect(root.textContent).toContain('Chorus groove');
     expect(root.textContent).toContain('Verse pocket');
@@ -47,7 +59,23 @@ describe('overlayView', () => {
     const root = document.createElement('div');
     const view = createOverlayView(root);
 
-    view.render(viewModel);
+    view.render({
+      ...screenModel,
+      shortcutKeymap: createShortcutKeymap({
+        increaseSpeed: {
+          code: 'KeyK',
+          shiftKey: true,
+          altKey: false,
+          ctrlKey: false,
+          metaKey: false,
+        },
+      }),
+      shortcutModal: {
+        isOpen: true,
+        captureAction: 'increaseSpeed',
+        statusMessage: 'Press a new shortcut',
+      },
+    });
 
     const increaseSpeedButton = root.querySelector<HTMLButtonElement>(
       '[data-shortcut-action="increaseSpeed"]',
@@ -60,9 +88,11 @@ describe('overlayView', () => {
     );
 
     expect(increaseSpeedButton?.title).toContain('Increase speed');
-    expect(increaseSpeedButton?.title).toContain('P');
+    expect(increaseSpeedButton?.title).toContain('Shift+K');
     expect(loopToggleButton?.title).toContain('Loop');
     expect(secondSection?.title).toContain('Click to run this section');
+    expect(root.textContent).toContain('Press a new shortcut');
+    expect(root.textContent).toContain('Select section 1');
     expect(root.querySelector('.bp-overlay__section--selected')).not.toBeNull();
     expect(root.querySelector('.bp-overlay__section--active')).not.toBeNull();
   });
@@ -71,6 +101,7 @@ describe('overlayView', () => {
     const root = document.createElement('div');
     const handledShortcuts: string[] = [];
     const executedSections: string[] = [];
+    const deletedSections: string[] = [];
     let toggledLoop = 0;
     const view = createOverlayView(root, {
       onShortcutAction(action) {
@@ -79,15 +110,21 @@ describe('overlayView', () => {
       onExecuteSection(sectionId) {
         executedSections.push(sectionId);
       },
+      onDeleteSection(sectionId) {
+        deletedSections.push(sectionId);
+      },
       onToggleLoop() {
         toggledLoop += 1;
       },
     });
 
-    view.render(viewModel);
+    view.render(screenModel);
 
     root
-      .querySelector<HTMLElement>('[data-section-id="section-2"]')
+      .querySelector<HTMLElement>('[data-overlay-action="executeSection"][data-section-id="section-2"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    root
+      .querySelector<HTMLElement>('[data-overlay-action="deleteSection"][data-section-id="section-2"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     root
       .querySelector<HTMLElement>('[data-shortcut-action="increaseSpeed"]')
@@ -97,6 +134,7 @@ describe('overlayView', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(executedSections).toEqual(['section-2']);
+    expect(deletedSections).toEqual(['section-2']);
     expect(handledShortcuts).toEqual(['increaseSpeed']);
     expect(toggledLoop).toBe(1);
   });
@@ -106,8 +144,11 @@ describe('overlayView', () => {
     const view = createOverlayView(root);
 
     view.render({
-      ...viewModel,
-      statusMessage: 'Start marked at 12.3s',
+      ...screenModel,
+      practice: {
+        ...viewModel,
+        statusMessage: 'Start marked at 12.3s',
+      },
     });
 
     expect(root.textContent).toContain('Start marked at 12.3s');

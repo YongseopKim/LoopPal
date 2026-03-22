@@ -613,6 +613,141 @@ describe('appController', () => {
     );
   });
 
+  it('selects a saved section by its stable slot number without starting playback', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+    player.setCurrentTime.mockClear();
+    player.playSafely.mockClear();
+
+    await controller.selectSectionSlot(2);
+
+    expect(player.setCurrentTime).not.toHaveBeenCalled();
+    expect(player.playSafely).not.toHaveBeenCalled();
+    expect(store.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionId: 'section-2',
+        activeSectionId: 'section-1',
+      }),
+    );
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Chorus',
+        activeSectionName: 'Verse',
+      }),
+    );
+  });
+
+  it('deletes a section, clears active loop when needed, and moves selection forward', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+    store.save.mockClear();
+    player.setCurrentTime.mockClear();
+    player.setPlaybackRate.mockClear();
+
+    await controller.deleteSection('section-1');
+
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedSectionId: 'section-2',
+        activeSectionId: null,
+        loopEnabled: false,
+        sections: expect.arrayContaining([
+          expect.objectContaining({ id: 'section-2' }),
+        ]),
+      }),
+    );
+    expect(store.save.mock.calls[0][0].sections).toHaveLength(1);
+    expect(player.setCurrentTime).not.toHaveBeenCalled();
+    expect(player.setPlaybackRate).not.toHaveBeenCalled();
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Chorus',
+        activeSectionName: null,
+        loopEnabled: false,
+      }),
+    );
+  });
+
+  it('asks before deleting via shortcut and does nothing when canceled', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const confirmDelete = vi.fn().mockReturnValue(false);
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+      confirmDelete,
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+    store.save.mockClear();
+
+    await controller.handleShortcut('deleteSelectedSection');
+
+    expect(confirmDelete).toHaveBeenCalledWith('Delete Verse?');
+    expect(store.save).not.toHaveBeenCalled();
+    expect(overlay.render).not.toHaveBeenCalled();
+  });
+
+  it('deletes the selected section via shortcut when confirmed', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+      confirmDelete: () => true,
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+    store.save.mockClear();
+
+    await controller.handleShortcut('deleteSelectedSection');
+
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedSectionId: 'section-2',
+        activeSectionId: null,
+        loopEnabled: false,
+        sections: expect.arrayContaining([
+          expect.objectContaining({ id: 'section-2' }),
+        ]),
+      }),
+    );
+    expect(store.save.mock.calls[0][0].sections).toHaveLength(1);
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Chorus',
+      }),
+    );
+  });
+
   it('toggles the current loop off while keeping the selection', async () => {
     const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
     const player = fakePlayer();

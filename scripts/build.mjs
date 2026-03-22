@@ -6,3 +6,4 @@ await build({ entryPoints: ['src/content/index.ts'], bundle: true, outfile: 'dis
 await build({ entryPoints: ['src/background/index.ts'], bundle: true, outfile: 'dist/background.js' });
 await cp('manifest.json', 'dist/manifest.json');
 await cp('src/content/overlay.css', 'dist/overlay.css');
+await cp('src/assets/icons', 'dist/icons', { recursive: true });

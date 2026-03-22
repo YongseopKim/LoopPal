@@ -1,5 +1,7 @@
 import {
-  DEFAULT_KEYMAP,
+  bindingsEqual,
+  keyboardEventToBinding,
+  type ShortcutKeymap,
   type ShortcutAction,
 } from './defaultKeymap';
 
@@ -41,24 +43,47 @@ function hasEditableTarget(event: KeyboardEvent): boolean {
 
 export function createShortcutController({
   onAction,
+  getKeymap,
 }: {
   onAction: (action: ShortcutAction) => void;
+  getKeymap: () => ShortcutKeymap;
 }) {
   return {
     handle(event: KeyboardEvent) {
-      if (event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-
       if (hasEditableTarget(event)) {
         return;
       }
 
-      const match = Object.entries(DEFAULT_KEYMAP).find(
-        ([, code]) => code === event.code,
+      const binding = keyboardEventToBinding(event);
+
+      if (!binding) {
+        return;
+      }
+
+      const keymap = getKeymap();
+      const match = Object.entries(keymap).find(
+        ([, expectedBinding]) => bindingsEqual(expectedBinding, binding),
       );
 
       if (!match) {
+        const deleteBinding = keymap.deleteSelectedSection;
+
+        if (
+          deleteBinding.code === 'Delete'
+          && !deleteBinding.shiftKey
+          && !deleteBinding.altKey
+          && !deleteBinding.ctrlKey
+          && !deleteBinding.metaKey
+          && binding.code === 'Backspace'
+          && !binding.shiftKey
+          && !binding.altKey
+          && !binding.ctrlKey
+          && !binding.metaKey
+        ) {
+          event.preventDefault();
+          onAction('deleteSelectedSection');
+        }
+
         return;
       }
 

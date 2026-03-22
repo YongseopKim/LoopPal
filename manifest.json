@@ -1,7 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Bass Practice Looper",
+  "name": "LoopPal",
+  "description": "YouTube practice companion for saved sections, fine loop control, and custom shortcuts.",
   "version": "0.1.0",
+  "action": {
+    "default_title": "LoopPal",
+    "default_icon": {
+      "16": "icons/icon.svg",
+      "32": "icons/icon.svg",
+      "48": "icons/icon.svg",
+      "128": "icons/icon.svg"
+    }
+  },
+  "icons": {
+    "16": "icons/icon.svg",
+    "32": "icons/icon.svg",
+    "48": "icons/icon.svg",
+    "128": "icons/icon.svg"
+  },
   "background": { "service_worker": "background.js", "type": "module" },
   "permissions": ["storage"],
   "host_permissions": ["https://www.youtube.com/*"],
