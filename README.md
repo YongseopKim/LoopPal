@@ -2,8 +2,8 @@
 
 Keyboard-first Chrome extension for `https://www.youtube.com/watch*` pages.
 It keeps bass practice sections in `chrome.storage.local`, restores the last
-session for each video, and renders a small always-visible practice panel below
-the YouTube player.
+session for each video, and renders an always-visible practice panel below the
+YouTube player.
 
 ## Current MVP
 
@@ -13,6 +13,9 @@ the YouTube player.
 - Creates sections from a marked start/end pair
 - Nudges selected section boundaries in `0.1s` steps
 - Steps playback speed in `0.05x` increments
+- Shows all saved sections in one list under the player
+- Lets you click a saved section to run it immediately
+- Renders clickable toolbar buttons with hover help for each shortcut
 - Prompts for section name and memo when a new section is created
 
 ## Development
@@ -27,8 +30,8 @@ npm run build
 `npm run test` is the fast jsdom/unit suite.
 `npm run test:smoke` launches local Chrome through Playwright, loads the built
 content bundle on a routed YouTube watch page, and verifies that the panel is
-mounted below the player, stays visible in the viewport, and responds to the
-section-start shortcut.
+mounted below the player, shows the saved section list, runs a clicked section,
+and responds to the Mark Start toolbar button.
 It is a real-browser smoke test for the built runtime, not a full Chrome
 extension installation test.
 
@@ -41,6 +44,15 @@ If Chrome is not installed in the default macOS location, set
 2. Enable `Developer mode`
 3. Click `Load unpacked`
 4. Select this project's `dist/` directory
+
+## Panel UI
+
+- The top toolbar shows the selected section, current loop state, speed buttons,
+  `Start +/- 0.1`, `End +/- 0.1`, `Mark Start`, `Mark End`, and `Loop On/Off`
+- Hover any toolbar button to see what it does and the matching shortcut
+- The section list under the toolbar always shows every saved section
+- Clicking a section row immediately jumps to it and starts looping it
+- Only the selected section shows its memo inline
 
 ## Default Shortcuts
 
@@ -60,13 +72,13 @@ If Chrome is not installed in the default macOS location, set
 ## Practice Flow
 
 1. Open a YouTube bass practice video.
-2. Press `;` at the section start.
-3. Press `'` at the section end.
+2. Click `Mark Start` or press `;` at the section start.
+3. Click `Mark End` or press `'` at the section end.
 4. Enter the section name and memo in the prompts.
-5. Use `[` and `]` to move selection without changing playback.
-6. Press `\` to jump to the selected section and loop it.
-7. Use `-`, `=`, `,`, `.` to fine-tune the selected section.
-8. Use `O` and `P` to adjust speed.
+5. Click a section row to jump to it immediately, or use `[` and `]` to move selection without changing playback.
+6. Press `\` to run the currently selected section.
+7. Use the toolbar buttons or `-`, `=`, `,`, `.` to fine-tune the selected section.
+8. Use the toolbar buttons or `O` and `P` to adjust speed.
 
 If no saved session exists yet, the overlay still appears and the speed
 shortcuts can create the initial per-video session state.
@@ -77,13 +89,15 @@ shortcuts can create the initial per-video session state.
 2. Run `npm run build`.
 3. Load `dist/` as an unpacked extension in Chrome.
 4. Open a `https://www.youtube.com/watch*` page.
-5. Create two sections with `;` then `'`, and confirm the name/memo prompts save.
-6. Toggle the section list with `/` and confirm the selected and active states are visible.
-7. Use `[` and `]` to change selection, then `\` to execute the selected loop.
-8. Use `-`, `=`, `,`, `.` and confirm the selected loop boundaries move in `0.1s` steps.
-9. Use `O` and `P` and confirm playback rate changes in `0.05x` steps.
-10. Refresh the page and confirm the previous session restores.
-11. Navigate to a different watch page and confirm the runtime rebinds to the new player.
+5. Confirm the toolbar and full section list are visible below the player.
+6. Create two sections with `Mark Start`/`Mark End` or `;` then `'`, and confirm the name/memo prompts save.
+7. Click a saved section row and confirm playback jumps to it immediately and starts looping.
+8. Use `[` and `]` to change selection without playback changing, then `\` to run the selected loop.
+9. Use the toolbar buttons or `-`, `=`, `,`, `.` and confirm the selected loop boundaries move in `0.1s` steps.
+10. Use the toolbar buttons or `O` and `P` and confirm playback rate changes in `0.05x` steps.
+11. Hover toolbar buttons and confirm the help text includes the action and shortcut.
+12. Refresh the page and confirm the previous session restores.
+13. Navigate to a different watch page and confirm the runtime rebinds to the new player.
 
 ## Notes
 

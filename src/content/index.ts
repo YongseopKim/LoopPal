@@ -107,8 +107,19 @@ function createBootstrapBinding(
     const store = createSessionStore(chrome.storage.local);
     const player = createYoutubePlayer(video);
     const overlayRoot = ensureOverlayRoot();
-    const overlay = createOverlayView(overlayRoot);
-    const controller = createAppController({
+    let controller: ReturnType<typeof createAppController> | null = null;
+    const overlay = createOverlayView(overlayRoot, {
+      onShortcutAction(action) {
+        void controller?.handleShortcut(action).catch(reportRuntimeError);
+      },
+      onExecuteSection(sectionId) {
+        void controller?.executeSection(sectionId).catch(reportRuntimeError);
+      },
+      onToggleLoop() {
+        void controller?.toggleLoop().catch(reportRuntimeError);
+      },
+    });
+    controller = createAppController({
       store,
       player,
       overlay: {

@@ -236,6 +236,14 @@ export function createAppController(deps: AppControllerDeps) {
   let statusMessage: string | null = null;
   let pendingShortcut: Promise<void> = Promise.resolve();
 
+  const enqueue = async (operation: () => Promise<void>) => {
+    const nextRun = pendingShortcut.then(operation);
+
+    pendingShortcut = nextRun.catch(() => undefined);
+
+    await nextRun;
+  };
+
   const render = () => {
     if (!isActive()) {
       return;
@@ -268,6 +276,11 @@ export function createAppController(deps: AppControllerDeps) {
     }
 
     await deps.store.save(session);
+  };
+
+  const renderSelectionRequired = () => {
+    statusMessage = 'Select a section first.';
+    render();
   };
 
   const applySectionPlayback = async (
@@ -370,12 +383,14 @@ export function createAppController(deps: AppControllerDeps) {
     direction: -1 | 1,
   ) => {
     if (!session) {
+      renderSelectionRequired();
       return;
     }
 
     const selectedSection = getSelectedSection(session);
 
     if (!selectedSection) {
+      renderSelectionRequired();
       return;
     }
 
@@ -464,6 +479,29 @@ export function createAppController(deps: AppControllerDeps) {
     render();
   };
 
+  const executeSelectedSection = async () => {
+    if (!session || !getSelectedSection(session)) {
+      renderSelectionRequired();
+      return;
+    }
+
+    statusMessage = null;
+    session = reduceSession(session, { type: 'executeSelectedSection' });
+    restoreStatus = await applySectionPlayback(getActiveSection(session), true);
+
+    if (!isActive()) {
+      return;
+    }
+
+    await deps.store.save(session);
+
+    if (!isActive()) {
+      return;
+    }
+
+    render();
+  };
+
   return {
     async start(): Promise<RestoreResult> {
       currentSpeed = deps.player.getPlaybackRate();
@@ -509,7 +547,7 @@ export function createAppController(deps: AppControllerDeps) {
       return { session, activeSection, restoreStatus };
     },
     async handleShortcut(action: ShortcutAction): Promise<void> {
-      const runShortcut = async () => {
+      await enqueue(async () => {
         if (!isActive()) {
           return;
         }
@@ -562,20 +600,53 @@ export function createAppController(deps: AppControllerDeps) {
           return;
         }
 
-        if (!session) {
+        if (action === 'selectPreviousSection' || action === 'selectNextSection') {
+          if (!session) {
+            return;
+          }
+
+          statusMessage = null;
+          session = reduceSession(session, { type: action });
+          if (!isActive()) {
+            return;
+          }
+
+          await deps.store.save(session);
+
+          if (!isActive()) {
+            return;
+          }
+
+          render();
+          return;
+        }
+
+        if (action === 'executeSelectedSection') {
+          await executeSelectedSection();
+        }
+      });
+    },
+    async executeSection(sectionId: string): Promise<void> {
+      await enqueue(async () => {
+        if (!isActive() || !session) {
+          return;
+        }
+
+        const nextSection = getSectionById(session, sectionId);
+
+        if (!nextSection) {
           return;
         }
 
         statusMessage = null;
-
-        if (action === 'selectPreviousSection' || action === 'selectNextSection') {
-          session = reduceSession(session, { type: action });
-        }
-
-        if (action === 'executeSelectedSection') {
-          session = reduceSession(session, { type: action });
-          restoreStatus = await applySectionPlayback(getActiveSection(session), true);
-        }
+        session = reduceSession(
+          {
+            ...session,
+            selectedSectionId: nextSection.id,
+          },
+          { type: 'executeSelectedSection' },
+        );
+        restoreStatus = await applySectionPlayback(getActiveSection(session), true);
 
         if (!isActive()) {
           return;
@@ -588,13 +659,59 @@ export function createAppController(deps: AppControllerDeps) {
         }
 
         render();
-      };
+      });
+    },
+    async toggleLoop(): Promise<void> {
+      await enqueue(async () => {
+        if (!isActive()) {
+          return;
+        }
 
-      const nextRun = pendingShortcut.then(runShortcut);
+        if (!session) {
+          renderSelectionRequired();
+          return;
+        }
 
-      pendingShortcut = nextRun.catch(() => undefined);
+        if (session.loopEnabled) {
+          session = {
+            ...session,
+            loopEnabled: false,
+            activeSectionId: null,
+          };
+          restoreStatus = 'idle';
+          statusMessage = 'Loop stopped';
 
-      await nextRun;
+          await deps.store.save(session);
+
+          if (!isActive()) {
+            return;
+          }
+
+          render();
+          return;
+        }
+
+        if (!getSelectedSection(session)) {
+          renderSelectionRequired();
+          return;
+        }
+
+        statusMessage = null;
+        session = reduceSession(session, { type: 'executeSelectedSection' });
+        restoreStatus = await applySectionPlayback(getActiveSection(session), true);
+
+        if (!isActive()) {
+          return;
+        }
+
+        await deps.store.save(session);
+
+        if (!isActive()) {
+          return;
+        }
+
+        render();
+      });
     },
     getLoopSection(): PracticeSection | null {
       if (!session || !session.loopEnabled) {

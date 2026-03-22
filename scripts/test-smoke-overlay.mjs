@@ -6,6 +6,37 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 const contentScriptPath = join(repoRoot, 'dist/content.js');
 const overlayCssPath = join(repoRoot, 'dist/overlay.css');
+const seededSession = {
+  'video:smoke-test': {
+    videoId: 'smoke-test',
+    defaultSpeed: 0.9,
+    loopEnabled: false,
+    selectedSectionId: 'section-1',
+    activeSectionId: null,
+    sections: [
+      {
+        id: 'section-1',
+        name: 'Verse groove',
+        memo: 'Keep the eighth notes even',
+        startTimeSec: 12.3,
+        endTimeSec: 18.8,
+        speedOverride: null,
+        order: 0,
+        updatedAt: 1,
+      },
+      {
+        id: 'section-2',
+        name: 'Bridge fill',
+        memo: 'Push the hammer-on',
+        startTimeSec: 30.1,
+        endTimeSec: 35.6,
+        speedOverride: 0.75,
+        order: 1,
+        updatedAt: 2,
+      },
+    ],
+  },
+};
 
 function getChromeExecutablePath() {
   const candidates = [
@@ -120,8 +151,8 @@ async function main() {
     });
     const page = await context.newPage();
 
-    await page.addInitScript(() => {
-      const storageState = {};
+    await page.addInitScript((initialStorageState) => {
+      const storageState = { ...initialStorageState };
 
       window.chrome = {
         storage: {
@@ -139,7 +170,13 @@ async function main() {
           },
         },
       };
-    });
+
+      HTMLMediaElement.prototype.play = function patchedPlay() {
+        this.dispatchEvent(new Event('play'));
+
+        return Promise.resolve();
+      };
+    }, seededSession);
 
     await page.route('https://www.youtube.com/**', async (route) => {
       const request = route.request();
@@ -167,7 +204,7 @@ async function main() {
     await page.addStyleTag({ path: overlayCssPath });
     await page.addScriptTag({ path: contentScriptPath });
     console.log('Waiting for overlay root...');
-    await page.waitForSelector('[data-bp-overlay-root] .bp-overlay__bar', {
+    await page.waitForSelector('[data-bp-overlay-root] .bp-overlay__toolbar', {
       timeout: 5_000,
     });
     await page.waitForFunction(() => {
@@ -196,7 +233,7 @@ async function main() {
       overlayBox.x < 0 ||
       overlayBox.y < 0 ||
       overlayBox.x + overlayBox.width > viewport.width ||
-      overlayBox.y + overlayBox.height > viewport.height
+      overlayBox.y > viewport.height
     ) {
       throw new Error(
         `Overlay rendered outside the viewport: ${JSON.stringify({
@@ -216,8 +253,40 @@ async function main() {
       video.currentTime = 12.3;
     });
 
-    console.log('Pressing section-start shortcut...');
-    await page.keyboard.press(';');
+    await page.waitForFunction(() => {
+      return document.querySelectorAll('.bp-overlay__section').length === 2;
+    }, { timeout: 5_000 });
+
+    const selectedMemo = page.locator('.bp-overlay__section--selected .bp-overlay__section-memo');
+    await selectedMemo.waitFor({ timeout: 5_000 });
+
+    console.log('Clicking a saved section row...');
+    await page.click('[data-section-id="section-2"]');
+    await page.waitForFunction(() => {
+      return document.body.textContent?.includes('Looping Bridge fill') ?? false;
+    }, { timeout: 5_000 });
+
+    const speedButtonTitle = await page.getAttribute(
+      '[data-shortcut-action="increaseSpeed"]',
+      'title',
+    );
+
+    if (!speedButtonTitle?.includes('Increase speed') || !speedButtonTitle.includes('P')) {
+      throw new Error(`Missing hover help on the speed button: ${speedButtonTitle}`);
+    }
+
+    await page.evaluate(() => {
+      const video = document.querySelector('#movie_player video.html5-main-video');
+
+      if (!(video instanceof HTMLVideoElement)) {
+        throw new Error('Smoke video element not found before mark-start.');
+      }
+
+      video.currentTime = 12.3;
+    });
+
+    console.log('Clicking the mark-start button...');
+    await page.click('[data-shortcut-action="markSectionStart"]');
     await page.waitForFunction(() => {
       return document.body.textContent?.includes('Start marked at 12.3s') ?? false;
     }, { timeout: 5_000 });

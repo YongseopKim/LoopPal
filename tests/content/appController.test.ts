@@ -575,6 +575,79 @@ describe('appController', () => {
     );
   });
 
+  it('executes a clicked section immediately and updates selection', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+    player.setCurrentTime.mockClear();
+    player.setPlaybackRate.mockClear();
+    player.playSafely.mockClear();
+
+    await controller.executeSection('section-2');
+
+    expect(player.setCurrentTime).toHaveBeenCalledWith(30.1);
+    expect(player.setPlaybackRate).toHaveBeenCalledWith(0.8);
+    expect(player.playSafely).toHaveBeenCalledTimes(1);
+    expect(store.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionId: 'section-2',
+        activeSectionId: 'section-2',
+        loopEnabled: true,
+      }),
+    );
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Chorus',
+        activeSectionName: 'Chorus',
+        loopEnabled: true,
+      }),
+    );
+  });
+
+  it('toggles the current loop off while keeping the selection', async () => {
+    const store = { load: vi.fn().mockResolvedValue(seedSession), save: vi.fn() };
+    const player = fakePlayer();
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    overlay.render.mockClear();
+    store.save.mockClear();
+    player.playSafely.mockClear();
+
+    await controller.toggleLoop();
+
+    expect(player.playSafely).not.toHaveBeenCalled();
+    expect(store.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionId: 'section-1',
+        activeSectionId: null,
+        loopEnabled: false,
+      }),
+    );
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selectedSectionName: 'Verse',
+        activeSectionName: null,
+        loopEnabled: false,
+      }),
+    );
+  });
+
   it('serializes shortcut handling so later inputs win the final rendered state', async () => {
     let resolvePlay: ((value: 'started' | 'blocked') => void) | null = null;
     const store = {
