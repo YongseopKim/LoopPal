@@ -11,6 +11,8 @@ export type OverlaySectionSummary = {
   name: string;
   memo: string;
   rangeLabel?: string;
+  startTimeSec?: number;
+  endTimeSec?: number;
   executionCounts?: {
     lastHour: number;
     lastDay: number;
@@ -28,8 +30,10 @@ export type OverlayViewModel = {
   speedLabel: string;
   loopEnabled: boolean;
   panelExpanded: boolean;
+  markStartPending?: boolean;
   restoreStatus?: 'idle' | 'started' | 'blocked';
   statusMessage?: string | null;
+  videoDurationSec?: number;
   sections: OverlaySectionSummary[];
 };
 
@@ -73,9 +77,12 @@ const TOOLBAR_BUTTONS: readonly ToolbarButtonSpec[] = [
   { action: 'nudgeSectionStartForward', label: 'Start +0.1' },
   { action: 'nudgeSectionEndBackward', label: 'End -0.1' },
   { action: 'nudgeSectionEndForward', label: 'End +0.1' },
-  { action: 'markSectionStart', label: 'Mark Start' },
-  { action: 'markSectionEnd', label: 'Mark End' },
 ] as const;
+
+type ControlButtonRenderOptions = {
+  isPressed?: boolean;
+  className?: string;
+};
 
 function escapeHtml(value: string): string {
   return value
@@ -89,19 +96,49 @@ function escapeHtml(value: string): string {
 function renderControlButton(
   keymap: ShortcutKeymap,
   spec: ToolbarButtonSpec,
+  options: ControlButtonRenderOptions = {},
 ): string {
   const actionMeta = SHORTCUT_ACTION_META[spec.action];
+  const isPressed = options.isPressed ?? false;
+  const extraClass = options.className ?? '';
+  const pressedClass = isPressed ? ' bp-overlay__control-button--pressed' : '';
 
   return `
     <button
       type="button"
-      class="bp-overlay__control-button"
+      class="bp-overlay__control-button${pressedClass}${extraClass ? ` ${extraClass}` : ''}"
       data-shortcut-action="${spec.action}"
       title="${escapeHtml(`${actionMeta.description} (${formatShortcutForAction(keymap, spec.action)})`)}"
     >
       ${escapeHtml(spec.label)}
     </button>
   `;
+}
+
+function formatRangeLabel(rangeStart: number, rangeEnd: number): string {
+  const format = (value: number): string => `${value.toFixed(1)}s`;
+
+  return `${format(rangeStart)} ~ ${format(rangeEnd)}`;
+}
+
+function formatTimelineRangeStyle(
+  startSec: number,
+  endSec: number,
+  durationSec: number,
+): string {
+  if (!Number.isFinite(durationSec) || durationSec <= 0) {
+    return '';
+  }
+
+  const safeStart = Math.max(0, startSec);
+  const safeEnd = Math.max(safeStart, endSec);
+  const left = `${Math.max(0, Math.min(100, (safeStart / durationSec) * 100)).toFixed(2)}%`;
+  const width = `${Math.max(
+    0.4,
+    Math.min(100 - parseFloat(left), ((safeEnd - safeStart) / durationSec) * 100),
+  ).toFixed(2)}%`;
+
+  return `left:${left};width:${width}`;
 }
 
 function renderLegend(keymap: ShortcutKeymap): string {
@@ -129,7 +166,7 @@ function renderLegend(keymap: ShortcutKeymap): string {
 function renderSections(model: OverlayViewModel): string {
   if (model.sections.length === 0) {
     return `
-      <div class="bp-overlay__panel">
+      <div class="bp-overlay__panel bp-overlay__saved-panel">
         <div class="bp-overlay__panel-header">
           <p class="bp-overlay__panel-title">Saved sections</p>
           <span class="bp-overlay__panel-meta">0 saved</span>
@@ -142,6 +179,12 @@ function renderSections(model: OverlayViewModel): string {
   const selectedSection = model.sections.find(
     (section) => section.id === model.selectedSectionId,
   );
+  const timelineDuration = model.videoDurationSec ?? 0;
+  const fallbackDuration = model.sections.reduce(
+    (current, section) => Math.max(current, section.endTimeSec ?? 0),
+    0,
+  );
+  const totalDurationSec = timelineDuration > 0 ? timelineDuration : Math.max(1, fallbackDuration);
 
   const sectionItems = model.sections
     .map((section) => {
@@ -164,7 +207,12 @@ function renderSections(model: OverlayViewModel): string {
       const rangeLabel =
         section.rangeLabel
           ? `<p class="bp-overlay__section-range">${escapeHtml(section.rangeLabel)}</p>`
-          : '';
+          : (section.startTimeSec === undefined || section.endTimeSec === undefined
+            ? ''
+            : `<p class="bp-overlay__section-range">${escapeHtml(formatRangeLabel(section.startTimeSec, section.endTimeSec))}</p>`);
+      const timelineStyle = section.startTimeSec === undefined || section.endTimeSec === undefined
+        ? ''
+        : `style="${formatTimelineRangeStyle(section.startTimeSec, section.endTimeSec, totalDurationSec)}"`;
       const executionCounts = section.executionCounts ?? {
         lastHour: 0,
         lastDay: 0,
@@ -188,6 +236,9 @@ function renderSections(model: OverlayViewModel): string {
                 <strong class="bp-overlay__section-name">${escapeHtml(section.name)}</strong>
                 <span class="bp-overlay__section-badges">${badges}</span>
               </span>
+              <div class="bp-overlay__section-timeline">
+                <span class="bp-overlay__section-timeline-range" ${timelineStyle}></span>
+              </div>
               ${rangeLabel}
               ${memo}
               ${executionLabel}
@@ -221,70 +272,84 @@ function renderSections(model: OverlayViewModel): string {
   `;
 }
 
-function renderToolbar(screen: OverlayScreenModel): string {
+function renderMainPanel(screen: OverlayScreenModel): string {
+  return renderMainControls(screen);
+}
+
+function renderSavedPanel(screen: OverlayScreenModel): string {
+  const sections = renderSections(screen.practice);
+
+  return `
+    <div class="bp-overlay__saved">
+      ${sections}
+    </div>
+  `;
+}
+
+function renderMainControls(screen: OverlayScreenModel): string {
   const model = screen.practice;
-  const loopTitle = model.loopEnabled
-    ? 'Loop off: stop repeating the active section (button only)'
-    : `Loop on: run the selected section and start looping it (${formatShortcutForAction(screen.shortcutKeymap, 'executeSelectedSection')})`;
-  const loopLabel = model.loopEnabled ? 'Loop Off' : 'Loop On';
   const activeSummary = model.activeSectionName
     ? `Looping ${model.activeSectionName}`
     : 'No active loop';
+  const selectedSection = model.sections.find(
+    (section) => section.id === model.selectedSectionId,
+  );
+  const loopTitle = model.loopEnabled
+    ? `Loop off: stop repeating ${selectedSection?.name ?? 'the selected section'}`
+    : `Loop on: run ${selectedSection?.name ?? 'the selected section'} (${formatShortcutForAction(screen.shortcutKeymap, 'executeSelectedSection')})`;
+  const loopLabel = model.loopEnabled ? 'Loop On' : 'Loop Off';
 
   return `
-    <div class="bp-overlay__toolbar">
-      <div class="bp-overlay__toolbar-group bp-overlay__toolbar-group--identity">
-        <span class="bp-overlay__selection-chip" title="Currently selected section">
-          ${escapeHtml(model.selectedSectionName ?? 'No section selected')}
-        </span>
-        <span class="bp-overlay__active-chip">${escapeHtml(activeSummary)}</span>
-      </div>
-
-      <div class="bp-overlay__toolbar-group bp-overlay__toolbar-group--speed">
-        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[0])}
-        <span class="bp-overlay__speed-chip" title="Current playback speed">
-          ${escapeHtml(model.speedLabel)}
-        </span>
-        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[1])}
-      </div>
-
-      <div class="bp-overlay__toolbar-group">
-        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[2])}
-        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[3])}
-      </div>
-
-      <div class="bp-overlay__toolbar-group">
-        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[4])}
-        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[5])}
-      </div>
-
-      <div class="bp-overlay__toolbar-group">
-        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[6])}
-        ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[7])}
-        <button
-          type="button"
-          class="bp-overlay__control-button bp-overlay__control-button--loop"
-          data-overlay-action="toggleLoop"
-          title="${escapeHtml(loopTitle)}"
-        >
-          ${escapeHtml(loopLabel)}
-        </button>
-        <button
-          type="button"
-          class="bp-overlay__control-button bp-overlay__control-button--settings"
-          data-overlay-action="openShortcutSettings"
-          title="Open shortcut settings"
-        >
-          Shortcuts
-        </button>
-        <button
-          type="button"
-          class="bp-overlay__control-button"
-          data-overlay-action="openKeyGuide"
-          title="Show or hide the full key guide"
-        >
-          Full key guide
-        </button>
+    <div class="bp-overlay__main">
+      <div class="bp-overlay__main-card">
+        <div class="bp-overlay__control-stack">
+          <div class="bp-overlay__control-group">
+            <button
+              type="button"
+              class="bp-overlay__control-button${selectedSection ? ' bp-overlay__control-button--pressed' : ''}"
+              title="Current selected section"
+            >
+              ${escapeHtml(selectedSection ? `Section ${model.sections.findIndex((section) => section.id === selectedSection.id) + 1}` : 'No section selected')}
+            </button>
+            <span class="bp-overlay__active-chip">${escapeHtml(activeSummary)}</span>
+          </div>
+          <div class="bp-overlay__control-group">
+            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[0])}
+            <span class="bp-overlay__speed-chip" title="Current playback speed">${escapeHtml(model.speedLabel)}</span>
+            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[1])}
+          </div>
+          <div class="bp-overlay__control-group">
+            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[2])}
+            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[3])}
+            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[4])}
+            ${renderControlButton(screen.shortcutKeymap, TOOLBAR_BUTTONS[5])}
+          </div>
+          <div class="bp-overlay__control-group">
+            ${renderControlButton(screen.shortcutKeymap, { action: 'markSectionStart', label: 'Mark Start' }, {
+              isPressed: model.markStartPending ?? false,
+              className: 'bp-overlay__control-button--mark',
+            })}
+            ${renderControlButton(screen.shortcutKeymap, { action: 'markSectionEnd', label: 'Mark End' })}
+          </div>
+          <div class="bp-overlay__control-group">
+            <button
+              type="button"
+              class="bp-overlay__control-button ${model.loopEnabled ? 'bp-overlay__control-button--loop-on' : 'bp-overlay__control-button--loop-off'}"
+              data-overlay-action="toggleLoop"
+              title="${escapeHtml(loopTitle)}"
+            >
+              ${escapeHtml(loopLabel)}
+            </button>
+            <button
+              type="button"
+              class="bp-overlay__control-button"
+              data-overlay-action="openShortcutSettings"
+              title="Open shortcuts"
+            >
+              Shortcuts
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -496,16 +561,18 @@ export function createOverlayView(
         (model.restoreStatus === 'blocked' ? 'Tap play to resume loop' : '');
       const statusLabel = statusText
         ? `<span class="bp-overlay__restore">${escapeHtml(statusText)}</span>`
-        : '<span class="bp-overlay__restore bp-overlay__restore--muted">Hover buttons to see the shortcuts. Click "Full key guide".</span>';
+        : '<span class="bp-overlay__restore bp-overlay__restore--muted">Hover buttons to see the shortcuts. Open Shortcuts for setup.</span>';
 
       root.innerHTML = `
-        <div class="bp-overlay">
-          ${renderToolbar(screen)}
+      <div class="bp-overlay">
           <div class="bp-overlay__status-row">
             <span class="bp-overlay__loop">${model.loopEnabled ? 'Loop on' : 'Loop off'}</span>
             ${statusLabel}
           </div>
-          ${renderSections(model)}
+          <div class="bp-overlay__shell">
+            ${renderMainPanel(screen)}
+            ${renderSavedPanel(screen)}
+          </div>
           ${model.panelExpanded ? renderLegend(screen.shortcutKeymap) : ''}
           ${renderShortcutModal(screen)}
         </div>

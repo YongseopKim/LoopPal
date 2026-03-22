@@ -204,7 +204,7 @@ async function main() {
     await page.addStyleTag({ path: overlayCssPath });
     await page.addScriptTag({ path: contentScriptPath });
     console.log('Waiting for overlay root...');
-    await page.waitForSelector('[data-bp-overlay-root] .bp-overlay__toolbar', {
+    await page.waitForSelector('[data-bp-overlay-root] .bp-overlay', {
       timeout: 5_000,
     });
     await page.waitForFunction(() => {

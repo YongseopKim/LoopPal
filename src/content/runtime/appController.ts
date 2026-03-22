@@ -305,6 +305,8 @@ function toViewModel(
   panelExpanded: boolean,
   statusMessage: string | null,
   now: number,
+  markStartPending: boolean,
+  videoDurationSec: number,
 ): OverlayViewModel {
   const selectedSection = session ? getSelectedSection(session) : null;
   const activeSection = session ? getActiveSection(session) : null;
@@ -319,6 +321,8 @@ function toViewModel(
     panelExpanded,
     restoreStatus,
     statusMessage,
+    markStartPending,
+    videoDurationSec,
     sections: (session?.sections ?? [])
       .slice()
       .sort((left, right) => left.order - right.order)
@@ -326,6 +330,8 @@ function toViewModel(
         id: section.id,
         name: section.name,
         memo: section.memo,
+        startTimeSec: section.startTimeSec,
+        endTimeSec: section.endTimeSec,
         rangeLabel: formatSectionRangeLabel(section),
         executionCounts: getSectionExecutionCounts(section, now),
       })),
@@ -388,7 +394,7 @@ export function createAppController(deps: AppControllerDeps) {
       return;
     }
 
-    deps.overlay.render(
+      deps.overlay.render(
       toViewModel(
         session,
         currentSpeed,
@@ -396,6 +402,8 @@ export function createAppController(deps: AppControllerDeps) {
         panelExpanded,
         statusMessage,
         getNow(),
+        draftStartTimeSec !== null,
+        deps.player.getDuration(),
       ),
     );
   };

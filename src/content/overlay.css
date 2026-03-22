@@ -37,7 +37,7 @@
   max-width: none;
 }
 
-.bp-overlay__toolbar,
+.bp-overlay__main,
 .bp-overlay__panel,
 .bp-overlay__legend,
 .bp-overlay__status-row {
@@ -47,34 +47,45 @@
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
 }
 
-.bp-overlay__toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 20px;
+.bp-overlay__shell {
+  display: grid;
+  grid-template-columns: minmax(380px, 1fr) minmax(320px, 1fr);
+  gap: 12px;
+  align-items: start;
 }
 
-.bp-overlay__toolbar-group {
+.bp-overlay__main-card {
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.bp-overlay__control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bp-overlay__control-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.bp-overlay__toolbar-group--identity {
-  min-width: min(280px, 100%);
+.bp-overlay__active-chip {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(250, 236, 206, 0.12);
+  border: 1px solid rgba(250, 236, 206, 0.18);
+  font-size: 13px;
+  white-space: nowrap;
+  opacity: 0.82;
 }
 
-.bp-overlay__toolbar-group--speed {
-  align-items: stretch;
-}
-
-.bp-overlay__selection-chip,
-.bp-overlay__active-chip,
 .bp-overlay__speed-chip {
   display: inline-flex;
   align-items: center;
@@ -127,9 +138,23 @@
   background: rgba(241, 190, 103, 0.14);
 }
 
-.bp-overlay__control-button--loop {
-  background: rgba(120, 191, 149, 0.14);
-  border-color: rgba(120, 191, 149, 0.28);
+.bp-overlay__control-button--pressed {
+  background: rgba(243, 205, 130, 0.14);
+  border-color: rgba(243, 205, 130, 0.48);
+}
+
+.bp-overlay__control-button--loop-on {
+  background: rgba(120, 191, 149, 0.18);
+  border-color: rgba(120, 191, 149, 0.38);
+}
+
+.bp-overlay__control-button--loop-off {
+  background: rgba(255, 113, 113, 0.16);
+  border-color: rgba(255, 113, 113, 0.34);
+}
+
+.bp-overlay__control-button--mark {
+  min-width: 108px;
 }
 
 .bp-overlay__status-row {
@@ -266,6 +291,25 @@
   gap: 10px;
 }
 
+.bp-overlay__section-timeline {
+  margin-top: 8px;
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(18, 27, 40, 0.85);
+  overflow: hidden;
+}
+
+.bp-overlay__section-timeline-range {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  height: 8px;
+  background: linear-gradient(90deg, #72c5ff, #95ff9f);
+  opacity: 0.95;
+}
+
 .bp-overlay__section-name {
   font-size: 14px;
 }
@@ -372,11 +416,6 @@
   background: rgba(255, 255, 255, 0.06);
   font: inherit;
   text-align: center;
-}
-
-.bp-overlay__control-button--settings {
-  background: rgba(243, 205, 130, 0.16);
-  border-color: rgba(243, 205, 130, 0.34);
 }
 
 .bp-overlay__modal-backdrop {
@@ -540,23 +579,19 @@
 }
 
 @media (max-width: 720px) {
-  .bp-overlay__toolbar,
+  .bp-overlay__shell,
   .bp-overlay__status-row,
   .bp-overlay__panel,
   .bp-overlay__legend {
     border-radius: 16px;
   }
 
-  .bp-overlay__toolbar {
-    justify-content: flex-start;
+  .bp-overlay__shell {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .bp-overlay__toolbar-group--identity {
-    justify-content: flex-start;
-  }
-
-  .bp-overlay__selection-chip,
-  .bp-overlay__active-chip {
-    max-width: 100%;
+  .bp-overlay__shell > .bp-overlay__saved,
+  .bp-overlay__shell > .bp-overlay__main {
+    grid-column: 1 / -1;
   }
 }
