@@ -14,11 +14,11 @@ creation, fine-grained edits, and keyboard-first control.
 
 ## Demo: how to use?
 
-...
+![demo0_0.gif](demo0_0.gif)
 
 ## Demo: how to install?
 
-...
+![demo1_0.gif](demo1_0.gif)
 
 ## Status Snapshot
 
