@@ -147,10 +147,35 @@ describe('overlayView', () => {
       ...screenModel,
       practice: {
         ...viewModel,
-        statusMessage: 'Start marked at 12.3s',
+        statusMessage: 'Start marked at 0:12.3',
       },
     });
 
-    expect(root.textContent).toContain('Start marked at 12.3s');
+    expect(root.textContent).toContain('Start marked at 0:12.3');
+  });
+
+  it('renders long section timestamps in watch-style timecode', () => {
+    const root = document.createElement('div');
+    const view = createOverlayView(root);
+
+    view.render({
+      ...screenModel,
+      practice: {
+        ...viewModel,
+        sections: [
+          {
+            id: 'section-1',
+            name: 'Long-form solo',
+            memo: 'stay relaxed',
+            startTimeSec: 3_723.4,
+            endTimeSec: 3_730.8,
+          },
+        ],
+      },
+    });
+
+    expect(root.textContent).toContain('1:02:03.4');
+    expect(root.textContent).toContain('1:02:10.8');
+    expect(root.textContent).not.toContain('3723.4s');
   });
 });

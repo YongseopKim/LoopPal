@@ -168,6 +168,69 @@ describe('appController', () => {
     );
   });
 
+  it('renders a watch-style status message when marking a start inside a long video', async () => {
+    const store = { load: vi.fn().mockResolvedValue(null), save: vi.fn() };
+    const player = fakePlayer({
+      currentTime: 3_723.44,
+      duration: 7_200,
+    });
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+    });
+
+    await controller.start();
+    await controller.handleShortcut('markSectionStart');
+
+    expect(overlay.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        statusMessage: 'Start marked at 1:02:03.4',
+      }),
+    );
+  });
+
+  it('keeps long-video section boundaries at the marked timestamps instead of collapsing to zero', async () => {
+    const store = { load: vi.fn().mockResolvedValue(null), save: vi.fn() };
+    const player = fakePlayer({
+      currentTime: 3_723.44,
+      duration: 7_200,
+    });
+    const overlay = fakeOverlay();
+    const controller = createAppController({
+      store,
+      player,
+      overlay,
+      videoId: 'abc123',
+      createSectionId: () => 'section-long',
+      getNow: () => 123,
+      promptForSectionDetails: vi.fn().mockReturnValue({
+        name: 'Hour mark',
+        memo: '',
+      }),
+    });
+
+    await controller.start();
+
+    await controller.handleShortcut('markSectionStart');
+    player.currentTime = 3_730.82;
+    await controller.handleShortcut('markSectionEnd');
+
+    expect(store.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sections: [
+          expect.objectContaining({
+            id: 'section-long',
+            startTimeSec: 3_723.4,
+            endTimeSec: 3_730.8,
+          }),
+        ],
+      }),
+    );
+  });
+
   it('persists a default speed change even when the video has no saved session yet', async () => {
     const store = { load: vi.fn().mockResolvedValue(null), save: vi.fn() };
     const player = fakePlayer({

@@ -1,5 +1,9 @@
 # LoopPal
 
+<p align="center">
+  <img src="./icon1.png" alt="LoopPal logo" width="360" />
+</p>
+
 LoopPal is a Chrome extension that helps with repeated practice on YouTube videos.
 It is built for `https://www.youtube.com/watch*` pages and focuses on quick section
 creation, fine-grained edits, and keyboard-first control.

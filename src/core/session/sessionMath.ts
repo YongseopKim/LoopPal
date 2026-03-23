@@ -6,6 +6,23 @@ export function normalizeTime(value: number): number {
   return Math.max(0, Math.round(value * 10) / 10);
 }
 
+export function formatTimeLabel(value: number): string {
+  const normalized = normalizeTime(value);
+  const totalTenths = Math.round(normalized * 10);
+  const totalSeconds = Math.floor(totalTenths / 10);
+  const tenths = totalTenths % 10;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const paddedSeconds = seconds.toString().padStart(2, '0');
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${paddedSeconds}.${tenths}`;
+  }
+
+  return `${minutes}:${paddedSeconds}.${tenths}`;
+}
+
 function normalizeDurationLimit(durationSec: number): number {
   return Math.floor((Math.max(0, durationSec) + DURATION_EPSILON) * 10) / 10;
 }

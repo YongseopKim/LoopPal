@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampSectionRange,
+  formatTimeLabel,
   normalizeTime,
   stepSpeed,
 } from '../../src/core/session/sessionMath';
@@ -9,6 +10,12 @@ describe('sessionMath', () => {
   it('rounds times to 0.1s precision', () => {
     expect(normalizeTime(12.26)).toBe(12.3);
     expect(normalizeTime(12.24)).toBe(12.2);
+  });
+
+  it('formats long timestamps in watch-style timecode', () => {
+    expect(formatTimeLabel(12.34)).toBe('0:12.3');
+    expect(formatTimeLabel(62.34)).toBe('1:02.3');
+    expect(formatTimeLabel(3_723.44)).toBe('1:02:03.4');
   });
 
   it('clamps section ranges to video bounds', () => {

@@ -1,5 +1,6 @@
 import {
   clampSectionRange,
+  formatTimeLabel,
   normalizeTime,
   stepSpeed,
 } from '../../core/session/sessionMath';
@@ -194,10 +195,6 @@ function createEmptySession(
 
 function formatSpeedLabel(speed: number): string {
   return `${speed.toFixed(2).replace(/\.?0+$/, '')}x`;
-}
-
-function formatTimeLabel(timeSec: number): string {
-  return `${normalizeTime(timeSec).toFixed(1)}s`;
 }
 
 function formatSectionRangeLabel(section: PracticeSection): string {

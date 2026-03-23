@@ -5,6 +5,7 @@ import {
   type ShortcutAction,
   type ShortcutKeymap,
 } from '../runtime/defaultKeymap';
+import { formatTimeLabel } from '../../core/session/sessionMath';
 
 export type OverlaySectionSummary = {
   id: string;
@@ -163,10 +164,6 @@ function formatTimelinePointerStyle(
   return `left:${left.toFixed(2)}%`;
 }
 
-function formatSectionTimeLabel(timeSec: number): string {
-  return `${timeSec.toFixed(1)}s`;
-}
-
 function renderLegend(keymap: ShortcutKeymap): string {
   return `
     <div class="bp-overlay__legend">
@@ -219,11 +216,11 @@ function renderSections(model: OverlayViewModel): string {
       const startLabel =
         section.startTimeSec === undefined
           ? '—'
-          : formatSectionTimeLabel(section.startTimeSec);
+          : formatTimeLabel(section.startTimeSec);
       const endLabel =
         section.endTimeSec === undefined
           ? '—'
-          : formatSectionTimeLabel(section.endTimeSec);
+          : formatTimeLabel(section.endTimeSec);
       const badges = [
         isSelected
           ? '<span class="bp-overlay__badge bp-overlay__badge--selected">Selected</span>'

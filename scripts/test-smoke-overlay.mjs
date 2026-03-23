@@ -291,7 +291,7 @@ async function main() {
     console.log('Clicking the mark-start button...');
     await page.click('[data-shortcut-action="markSectionStart"]');
     await page.waitForFunction(() => {
-      return document.body.textContent?.includes('Start marked at 12.3s') ?? false;
+      return document.body.textContent?.includes('Start marked at 0:12.3') ?? false;
     }, { timeout: 5_000 });
 
     console.log('Playwright smoke test passed.');
