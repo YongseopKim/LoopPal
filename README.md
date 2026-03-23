@@ -8,6 +8,18 @@ LoopPal is a Chrome extension that helps with repeated practice on YouTube video
 It is built for `https://www.youtube.com/watch*` pages and focuses on quick section
 creation, fine-grained edits, and keyboard-first control.
 
+## Download
+
+[LoopPal latest](https://github.com/YongseopKim/LoopPal/releases/latest/download/looppal-chrome-extension.zip)
+
+## Demo: how to use?
+
+...
+
+## Demo: how to install?
+
+...
+
 ## Status Snapshot
 
 - The extension is implemented and runnable locally.
